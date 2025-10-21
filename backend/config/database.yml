@@ -1,0 +1,15 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: localhost
+  username: postgres
+  password: postgres
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+development:
+  <<: *default
+  database: trello_clone_dev
+
+test:
+  <<: *default
+  database: trello_clone_test
