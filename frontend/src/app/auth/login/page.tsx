@@ -16,8 +16,7 @@ interface LoginInput {
 }
 
 interface LoginResponse {
-  loginUser: {
-    user: { id: number; email: string };
+  login: {
     token: string;
     errors: string[];
   };
@@ -31,14 +30,21 @@ export default function LoginPage() {
 
   const mutation = useMutation<LoginResponse, Error, LoginInput>({
     mutationFn: async ({ email, password }) => {
+      const client = getGraphQLClient(); // dynamic client
       return client.request(LOGIN_USER, { email, password });
     },
     onSuccess: (res) => {
-      if (res.loginUser.errors.length === 0) {
-        localStorage.setItem("token", res.loginUser.token);
-        router.push("/"); // redirect after login
+      if (res.login.errors.length === 0 && res.login.token) {
+        localStorage.setItem("token", res.login.token);
+        
+        // Since login doesn't return user data, we'll need to get it from the JWT token
+        // or try to extract from localStorage if it was set during registration
+        // If the user was just registered and then logged in, userData should be in localStorage
+        // Otherwise, we'll rely on JWT decoding to get user info
+        
+        router.push("/boards"); // redirect to boards page after login
       } else {
-        alert(res.loginUser.errors.join(", "));
+        alert(res.login.errors.join(", "));
       }
     },
   });
@@ -83,9 +89,9 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={mutation.isLoading}
+              disabled={mutation.isPending}
             >
-              {mutation.isLoading ? "Signing In..." : "Sign In"}
+              {mutation.isPending ? "Signing In..." : "Sign In"}
             </Button>
           </form>
         </CardContent>

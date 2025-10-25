@@ -11,8 +11,10 @@ module Mutations
       return { column: nil, errors: ["Unauthorized"] } unless user
       board = Board.find(board_id)
       return { column: nil, errors: ["Unauthorized"] } unless board.user == user
-      column = board.columns.build(name: name)
-
+      
+      # Determine the position for the new column
+      max_position = board.columns.maximum(:position) || 0
+      column = board.columns.build(name: name, position: max_position + 1)
 
       if column.save
         { column: column, errors: [] }

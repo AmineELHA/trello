@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_21_092302) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_25_162118) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -25,7 +25,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_21_092302) do
   create_table "columns", force: :cascade do |t|
     t.bigint "board_id", null: false
     t.string "name"
-    t.integer "position"
+    t.integer "position", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["board_id"], name: "index_columns_on_board_id"
@@ -38,6 +38,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_21_092302) do
     t.bigint "column_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.datetime "due_date"
+    t.string "labels", default: [], array: true
+    t.json "checklists", default: []
+    t.string "attachments", default: [], array: true
     t.index ["column_id"], name: "index_tasks_on_column_id"
   end
 
@@ -49,6 +53,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_21_092302) do
     t.datetime "remember_created_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "first_name"
+    t.string "last_name"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
