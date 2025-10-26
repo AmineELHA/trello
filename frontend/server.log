@@ -1,0 +1,181 @@
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /home/amine/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /home/amine/projects/trello/frontend/package-lock.json
+
+   ▲ Next.js 15.5.6
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.100.172:3002
+
+ ✓ Starting...
+ ✓ Ready in 1558ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.8s (1548 modules)
+ GET / 200 in 3209ms
+ ✓ Compiled in 343ms (701 modules)
+ ✓ Compiled in 279ms (701 modules)
+ ✓ Compiled in 121ms (701 modules)
+ ✓ Compiled in 230ms (701 modules)
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unterminated string constant
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m ^^^^^^^^^^^^^^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+  [31mx[0m Expected unicode escape
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unterminated string constant
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m ^^^^^^^^^^^^^^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+  [31mx[0m Expected unicode escape
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unterminated string constant
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m ^^^^^^^^^^^^^^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+  [31mx[0m Expected unicode escape
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ ⨯ ./src/app/page.tsx
+Error:   [31mx[0m Unterminated string constant
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m ^^^^^^^^^^^^^^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+  [31mx[0m Expected unicode escape
+   ,-[[36;1;4m/home/amine/projects/trello/frontend/src/app/page.tsx[0m:1:1]
+ [2m1[0m | \"use client\";
+   : [35;1m^[0m
+ [2m2[0m | 
+ [2m3[0m | import { Button } from \"@/components/ui/button\";
+ [2m4[0m | import { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";
+   `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/app/page.tsx
+ ✓ Compiled in 1398ms (701 modules)
+ ✓ Compiled in 156ms (701 modules)
+ ✓ Compiled in 146ms (701 modules)
+ ✓ Compiled in 218ms (701 modules)
+ ✓ Compiled in 234ms (701 modules)
+ ✓ Compiled in 296ms (701 modules)
+ ✓ Compiled in 144ms (701 modules)
+ ✓ Compiled in 131ms (701 modules)
+ ✓ Compiled in 243ms (701 modules)
+ ✓ Compiled in 124ms (701 modules)
+ ✓ Compiled in 116ms (701 modules)
+ ✓ Compiled in 120ms (701 modules)
+ ✓ Compiled in 173ms (701 modules)
+ ✓ Compiled in 104ms (701 modules)
+ ✓ Compiled in 123ms (701 modules)
+ ✓ Compiled in 69ms (687 modules)
+ ✓ Compiled in 89ms (701 modules)
+ ✓ Compiled in 138ms (701 modules)
+ ✓ Compiled in 74ms (687 modules)
+ ✓ Compiled in 148ms (701 modules)
+ ✓ Compiled in 80ms (701 modules)
+ ✓ Compiled in 61ms (687 modules)
+ ✓ Compiled in 196ms (701 modules)
+ ✓ Compiled in 172ms (701 modules)
+ ✓ Compiled in 106ms (701 modules)
+ ✓ Compiled in 178ms (701 modules)
+ ✓ Compiled in 103ms (701 modules)
+ ✓ Compiled in 198ms (701 modules)
+ ✓ Compiled in 105ms (701 modules)
+ ✓ Compiled in 114ms (701 modules)
+ ✓ Compiled in 90ms (701 modules)
+ ✓ Compiled in 164ms (701 modules)
+ ✓ Compiled in 99ms (701 modules)
+ ✓ Compiled in 124ms (701 modules)
+ ✓ Compiled in 363ms (701 modules)
+ ✓ Compiled in 126ms (701 modules)
+ ✓ Compiled in 237ms (701 modules)
+ ✓ Compiled in 208ms (701 modules)
+ ✓ Compiled in 144ms (701 modules)
+ ✓ Compiled in 121ms (701 modules)
+ ✓ Compiled in 170ms (701 modules)
+ ✓ Compiled in 245ms (701 modules)
+ ✓ Compiled in 120ms (701 modules)
+ ✓ Compiled in 146ms (701 modules)
+ ✓ Compiled in 186ms (701 modules)
+ ✓ Compiled in 113ms (701 modules)
+ ✓ Compiled in 116ms (701 modules)
+ ✓ Compiled in 99ms (701 modules)
+ ✓ Compiled in 132ms (701 modules)
+ ✓ Compiled in 121ms (701 modules)
+ ✓ Compiled in 216ms (701 modules)
+ ✓ Compiled in 130ms (701 modules)
+ ✓ Compiled in 182ms (701 modules)
+ ✓ Compiled in 169ms (701 modules)
+ ✓ Compiled in 146ms (701 modules)
+ ✓ Compiled in 136ms (701 modules)
+ ✓ Compiled in 111ms (701 modules)
+ ✓ Compiled in 257ms (701 modules)
+ ✓ Compiled in 127ms (701 modules)
+ ✓ Compiled in 118ms (701 modules)
+ ✓ Compiled in 100ms (701 modules)
+ ✓ Compiled in 115ms (701 modules)
+ ✓ Compiled in 150ms (701 modules)
+ ✓ Compiled in 177ms (701 modules)
+ ✓ Compiled in 133ms (701 modules)
+ ✓ Compiled in 136ms (701 modules)
+ ✓ Compiled in 238ms (701 modules)
+ ✓ Compiled in 120ms (701 modules)
+[?25h

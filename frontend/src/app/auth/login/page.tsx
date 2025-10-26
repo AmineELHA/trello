@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { getGraphQLClient } from "../../lib/graphqlClient";
-import { LOGIN_USER } from "../../graphql/mutations";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,42 +13,68 @@ interface LoginInput {
 }
 
 interface LoginResponse {
-  login: {
-    token: string;
-    errors: string[];
-  };
+  success: boolean;
+  token?: string;
+  errors?: string[];
 }
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
-  const client = getGraphQLClient();
 
-  const mutation = useMutation<LoginResponse, Error, LoginInput>({
-    mutationFn: async ({ email, password }) => {
-      const client = getGraphQLClient(); // dynamic client
-      return client.request(LOGIN_USER, { email, password });
-    },
-    onSuccess: (res) => {
-      if (res.login.errors.length === 0 && res.login.token) {
-        localStorage.setItem("token", res.login.token);
-        
-        // Since login doesn't return user data, we'll need to get it from the JWT token
-        // or try to extract from localStorage if it was set during registration
-        // If the user was just registered and then logged in, userData should be in localStorage
-        // Otherwise, we'll rely on JWT decoding to get user info
-        
-        router.push("/boards"); // redirect to boards page after login
+  // Check if user is already authenticated when the page loads
+  useEffect(() => {
+    const checkAuth = async () => {
+      // Check cookies by looking at document.cookie
+      if (document.cookie.includes('auth-token')) {
+        router.push("/boards");
       } else {
-        alert(res.login.errors.join(", "));
+        // Check localStorage as fallback
+        const token = localStorage.getItem("token");
+        if (token) {
+          router.push("/boards");
+        }
       }
-    },
-  });
+    };
 
-  const handleSubmit = (e: React.FormEvent) => {
+    checkAuth();
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    mutation.mutate({ email, password });
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data: LoginResponse = await response.json();
+
+      if (!response.ok || data.errors) {
+        setError(data.errors?.join(", ") || "Login failed");
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.success && data.token) {
+        // Set token in localStorage as fallback for client-side operations
+        localStorage.setItem("token", data.token);
+        router.push("/boards");
+      }
+    } catch (err) {
+      setError("An error occurred during login");
+      setIsLoading(false);
+      console.error(err);
+    }
   };
 
   return (
@@ -61,6 +84,11 @@ export default function LoginPage() {
           <CardTitle className="text-2xl">Sign In</CardTitle>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
               <Label htmlFor="email">Email</Label>
@@ -89,9 +117,9 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={mutation.isPending}
+              disabled={isLoading}
             >
-              {mutation.isPending ? "Signing In..." : "Sign In"}
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
         </CardContent>

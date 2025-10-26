@@ -11,9 +11,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import useAuth from "../../hooks/useAuth";
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { Plus, Archive, Trash2, GripVertical, CheckCircle, Circle } from "lucide-react";
+import { Plus, Archive, Trash2, GripVertical, CheckCircle, Circle, MoreHorizontal, Edit3, X, Star, Lightbulb, Filter, Search, ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import UserProfileDropdown from "@/components/ui/user-profile-dropdown";
 
 // Define TypeScript types first
 type ChecklistItem = {
@@ -38,7 +37,6 @@ type Column = {
   name: string;
   position: number;
   tasks: Task[];
-  color?: string;
 };
 
 type Board = {
@@ -71,24 +69,27 @@ const TaskComponent = ({
           {...provided.dragHandleProps}
           className={`${snapshot.isDragging ? 'shadow-lg scale-[1.02] z-20' : 'hover:shadow-md'} transition-all duration-150 mb-2 ${className}`}
         >
-          <Card className={`p-3 bg-card ${snapshot.isDragging ? 'opacity-90' : ''}`}>
+          <Card className={`p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 ${snapshot.isDragging ? 'opacity-90' : ''}`}>
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <div className="cursor-grab active:cursor-grabbing">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <GripVertical className="h-4 w-4" />
                   </div>
                   <h4 className="font-medium text-sm truncate">{task.title}</h4>
                 </div>
                 
                 {task.description && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 mb-2">{task.description}</p>
                 )}
                 
                 {task.labels && task.labels.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-1 mb-2">
                     {task.labels.map((label, index) => (
-                      <span key={index} className="bg-secondary text-xs px-2 py-0.5 rounded">
+                      <span 
+                        key={index} 
+                        className="text-xs px-2 py-0.5 rounded-full bg-purple-500 text-white" 
+                      >
                         {label}
                       </span>
                     ))}
@@ -96,22 +97,19 @@ const TaskComponent = ({
                 )}
                 
                 {task.dueDate && (
-                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <span>{new Date(task.dueDate).toLocaleDateString()}</span>
                   </div>
                 )}
               </div>
               
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button 
                   size="icon" 
                   variant="ghost" 
-                  className="h-6 w-6"
-                  onClick={() => {
-                    // Implement edit functionality
-                  }}
+                  className="h-6 w-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  <Edit3 className="h-3 w-3" />
                 </Button>
                 <Button 
                   size="icon" 
@@ -142,9 +140,7 @@ const ColumnComponent = ({
   deleteTaskMutation,
   deleteColumnMutation,
   columnToDelete,
-  setColumnToDelete,
-  columnColors,
-  setColumnColors
+  setColumnToDelete
 }: { 
   column: Column; 
   index: number;
@@ -161,23 +157,8 @@ const ColumnComponent = ({
   };
   columnToDelete: string | null;
   setColumnToDelete: React.Dispatch<React.SetStateAction<string | null>>;
-  columnColors: {[key: string]: string};
-  setColumnColors: React.Dispatch<React.SetStateAction<{[key: string]: string}>>;
 }) => {
-  const [showColorPicker, setShowColorPicker] = useState(false);
-
-  const availableColors = [
-    'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 
-    'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
-  ];
-
-  const handleColorSelect = (color: string) => {
-    setColumnColors(prev => ({
-      ...prev,
-      [column.id]: color
-    }));
-    setShowColorPicker(false);
-  };
+  const [showColumnOptions, setShowColumnOptions] = useState(false);
 
   return (
     <Draggable draggableId={column.id.toString()} index={index}>
@@ -185,82 +166,35 @@ const ColumnComponent = ({
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
-          className={`flex flex-col w-72 ${snapshot.isDragging ? 'scale-[1.02] shadow-lg z-10' : ''}`}
+          className={`flex flex-col w-72 ${snapshot.isDragging ? 'scale-[1.02] shadow-lg z-10' : ''} bg-gray-100 dark:bg-gray-800/50 rounded-lg`}
         >
           <div 
-            className={`flex items-center justify-between p-3 rounded-t-lg ${column.color || 'bg-secondary'}`} 
-            style={{ backgroundColor: columnColors[column.id] || undefined }}
+            className="flex items-center justify-between p-3 rounded-t-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
             {...provided.dragHandleProps}
           >
-            <h3 className="font-semibold text-sm">{column.name}</h3>
+            <h3 className="font-semibold text-sm truncate">{column.name}</h3>
+            
             <div className="flex gap-1">
               <button 
-                className="p-1 rounded hover:bg-accent"
-                onClick={() => setShowColorPicker(!showColorPicker)}
-                title="Change color"
+                className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                onClick={() => setShowColumnOptions(!showColumnOptions)}
               >
-                <div className="w-4 h-4 rounded-full bg-current" style={{ backgroundColor: columnColors[column.id] || '#f3f4f6' }}></div>
+                <MoreHorizontal className="h-4 w-4" />
               </button>
-              {columnToDelete === column.id ? (
-                <div className="flex gap-1">
+              
+              {showColumnOptions && (
+                <div className="absolute mt-8 bg-white dark:bg-gray-800 shadow-lg rounded-md p-1 z-20 right-3 w-48">
                   <button 
-                    className="p-1 rounded hover:bg-red-600 hover:text-white"
-                    onClick={() => {
-                      deleteColumnMutation.mutate({ id: column.id });
-                      setColumnToDelete(null);
-                    }}
-                    title="Confirm delete"
+                    className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 flex items-center gap-2"
+                    onClick={() => setColumnToDelete(column.id)}
                   >
-                    <CheckCircle className="h-4 w-4" />
-                  </button>
-                  <button 
-                    className="p-1 rounded hover:bg-gray-200"
-                    onClick={() => setColumnToDelete(null)}
-                    title="Cancel delete"
-                  >
-                    <Circle className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
+                    Delete column
                   </button>
                 </div>
-              ) : (
-                <button 
-                  className="p-1 rounded hover:bg-red-100 hover:text-red-600"
-                  onClick={() => setColumnToDelete(column.id)}
-                  title="Delete column"
-                >
-                  <Trash2 className="h-4 w-4 text-white" />
-                </button>
               )}
             </div>
           </div>
-          
-          {/* Color Picker Dropdown */}
-          {showColorPicker && (
-            <div className="absolute z-10 mt-1 w-48 bg-white rounded-md shadow-lg p-2 border">
-              <div className="grid grid-cols-4 gap-2">
-                {availableColors.map((color, idx) => (
-                  <button
-                    key={idx}
-                    className={`w-8 h-8 rounded-full ${color} hover:opacity-90 transition-opacity`}
-                    onClick={() => handleColorSelect(color.replace('bg-', ''))}
-                    title={color.replace('bg-', '')}
-                  />
-                ))}
-              </div>
-              <button
-                className="mt-2 w-full text-xs text-center text-gray-500 hover:text-gray-700"
-                onClick={() => {
-                  setColumnColors(prev => {
-                    const newColors = {...prev};
-                    delete newColors[column.id];
-                    return newColors;
-                  });
-                  setShowColorPicker(false);
-                }}
-              >
-                Remove Color
-              </button>
-            </div>
-          )}
           
           <Droppable 
             droppableId={column.id.toString()} 
@@ -274,21 +208,22 @@ const ColumnComponent = ({
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex-1 min-h-[100px] bg-secondary/50 rounded-b-lg p-2 transition-colors duration-200 ${
+                className={`flex-1 min-h-[100px] overflow-y-auto p-2 rounded-b-lg ${
                   snapshot.isDraggingOver 
-                    ? 'bg-primary/20 border-2 border-dashed border-primary/50' 
-                    : 'bg-secondary/50'
+                    ? 'bg-purple-100/50 dark:bg-purple-900/20' 
+                    : 'bg-gray-100/50 dark:bg-gray-700/30'
                 }`}
               >
                 {column.tasks && Array.isArray(column.tasks) ? 
                   column.tasks.map((task, taskIndex) => (
-                    <TaskComponent 
-                      key={`${task.id}`} 
-                      task={task} 
-                      index={taskIndex}
-                      deleteTaskMutation={deleteTaskMutation}
-                      className=""
-                    />
+                    <div key={`${task.id}`} className="group">
+                      <TaskComponent 
+                        task={task} 
+                        index={taskIndex}
+                        deleteTaskMutation={deleteTaskMutation}
+                        className=""
+                      />
+                    </div>
                   )) 
                 : []
                 }
@@ -297,10 +232,10 @@ const ColumnComponent = ({
                 {/* Add Task Form */}
                 <form
                   onSubmit={(e) => handleCreateTask(e, column.id)}
-                  className="mt-2"
+                  className="mt-2 p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg"
                 >
                   <Input
-                    placeholder="Add a task..."
+                    placeholder="Enter a title for this card..."
                     value={newTaskTitle[column.id] || ""}
                     onChange={(e) => {
                       setNewTaskTitle(prev => ({
@@ -308,11 +243,26 @@ const ColumnComponent = ({
                         [column.id]: e.target.value
                       }));
                     }}
-                    className="text-sm"
+                    className="text-sm mb-2"
+                    autoFocus
                   />
-                  <div className="flex gap-2 mt-2">
-                    <Button type="submit" size="sm" className="w-full">
-                      Add Task
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8">
+                      Add Card
+                    </Button>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="ghost"
+                      className="h-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      onClick={() => {
+                        setNewTaskTitle(prev => ({
+                          ...prev,
+                          [column.id]: ""
+                        }));
+                      }}
+                    >
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </form>
@@ -335,7 +285,7 @@ export default function BoardDetailPage() {
   const [newColumnName, setNewColumnName] = useState("");
   const [showAddColumnInput, setShowAddColumnInput] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
-  const [columnColors, setColumnColors] = useState<{[key: string]: string}>({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch board and columns
   const { data, isLoading, error, refetch } = useQuery({
@@ -350,17 +300,9 @@ export default function BoardDetailPage() {
   // Update local state when data changes
   useEffect(() => {
     if (data?.columns) {
-      // Preserve column colors when updating columns
-      const updatedColumns = data.columns.map(col => {
-        // If the column had a custom color, preserve it
-        if (columnColors[col.id]) {
-          return { ...col, color: columnColors[col.id] };
-        }
-        return col;
-      });
-      setLocalColumns(updatedColumns);
+      setLocalColumns(data.columns);
     }
-  }, [data, columnColors]);
+  }, [data]);
 
   const client = getGraphQLClient();
 
@@ -486,9 +428,7 @@ export default function BoardDetailPage() {
     },
   });
 
-  if (authLoading) return <div className="flex justify-center items-center h-screen">Loading...</div>;
-
-
+  if (authLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading...</div>;
 
   const handleCreateTask = (e: React.FormEvent, columnId: string) => {
     e.preventDefault();
@@ -504,13 +444,6 @@ export default function BoardDetailPage() {
       [columnId]: ""
     }));
   };
-
-  // Use local state to manage the board data and avoid re-renders during drag
-  if (isLoading) return <div className="flex justify-center items-center h-screen">Loading board...</div>;
-  if (error) return <div className="flex justify-center items-center h-screen">Error loading board: {error instanceof Error ? error.message : 'Unknown error'}</div>;
-  if (!data) return <div className="flex justify-center items-center h-screen">Board not found</div>;
-
-  const columns = localColumns;
 
   // Handle drag and drop with optimistic updates
   const handleOnDragEnd = (result: DropResult) => {
@@ -530,7 +463,7 @@ export default function BoardDetailPage() {
     // Handle column reordering
     if (type === 'COLUMN') {
       // Optimistically update the UI
-      const newColumns = Array.from(columns);
+      const newColumns = Array.from(localColumns);
       const movedColumn = newColumns.find(col => col.id.toString() === draggableId);
       
       if (movedColumn) {
@@ -544,16 +477,6 @@ export default function BoardDetailPage() {
         
         setLocalColumns(newColumns);
         
-        // Preserve column colors after reordering
-        // Create a new mapping based on the new column order
-        const newColumnColors: {[key: string]: string} = {};
-        newColumns.forEach(col => {
-          if (columnColors[col.id]) {
-            newColumnColors[col.id] = columnColors[col.id];
-          }
-        });
-        setColumnColors(newColumnColors);
-        
         // Then send the mutation
         reorderColumnMutation.mutate({
           column_id: draggableId,
@@ -564,15 +487,15 @@ export default function BoardDetailPage() {
     }
 
     // Get the source and destination columns to properly handle position updates
-    const sourceColumn = columns.find(col => col.id.toString() === source.droppableId);
-    const destColumn = columns.find(col => col.id.toString() === destination.droppableId);
+    const sourceColumn = localColumns.find(col => col.id.toString() === source.droppableId);
+    const destColumn = localColumns.find(col => col.id.toString() === destination.droppableId);
 
     if (!sourceColumn || !destColumn) return;
 
     // Handle task reordering
     if (source.droppableId === destination.droppableId) {
       // Moving task within the same column - optimistic update
-      const newColumns = Array.from(columns);
+      const newColumns = Array.from(localColumns);
       const sourceColIndex = newColumns.findIndex(col => col.id.toString() === source.droppableId);
       
       if (sourceColIndex !== -1) {
@@ -596,7 +519,7 @@ export default function BoardDetailPage() {
       }
     } else {
       // Moving task to a different column - optimistic update
-      const newColumns = Array.from(columns);
+      const newColumns = Array.from(localColumns);
       const sourceColIndex = newColumns.findIndex(col => col.id.toString() === source.droppableId);
       const destColIndex = newColumns.findIndex(col => col.id.toString() === destination.droppableId);
       
@@ -634,19 +557,79 @@ export default function BoardDetailPage() {
     }
   };
 
+  // Filter columns based on search term
+  const filteredColumns = searchTerm 
+    ? localColumns.map(column => ({
+        ...column,
+        tasks: column.tasks.filter(task => 
+          task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (task.labels && task.labels.some(label => label.toLowerCase().includes(searchTerm.toLowerCase())))
+        )
+      }))
+    : localColumns;
+
+  if (isLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading board...</div>;
+  if (error) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Error loading board: {error instanceof Error ? error.message : 'Unknown error'}</div>;
+  if (!data) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Board not found</div>;
+
+  const columns = localColumns;
+
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <Link href="/boards" className="text-primary hover:underline text-sm mb-1 inline-block">
-              ← Back to Boards
-            </Link>
-            <h1 className="text-2xl font-bold">{data.name}</h1>
+        <div className="flex justify-between items-center mb-6 py-2 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-4">
+            <div>
+              <Link href="/boards" className="flex items-center gap-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 text-sm mb-1">
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to Boards</span>
+              </Link>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{data.name}</h1>
+                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
+                  Private
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <UserProfileDropdown />
+          <div className="flex items-center gap-2">
+            {/* Member avatars */}
+            <div className="flex -space-x-2">
+              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium border-2 border-white dark:border-gray-800">
+                U
+              </div>
+              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium border-2 border-white dark:border-gray-800">
+                T
+              </div>
+            </div>
+            
+            {/* Action icons */}
+            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <Star className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <Lightbulb className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <Filter className="h-4 w-4" />
+            </Button>
+            
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search..."
+                className="pl-8 w-40 h-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <Button variant="outline" className="border-gray-300 dark:border-gray-600 dark:text-white dark:hover:bg-gray-800">
+              Share
+            </Button>
           </div>
         </div>
 
@@ -657,40 +640,39 @@ export default function BoardDetailPage() {
               <div 
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className={`flex gap-4 overflow-x-auto pb-4 transition-colors duration-200 ${
+                className={`flex gap-4 overflow-x-auto pb-4 transition-colors duration-200 p-2 ${
                   snapshot.isDraggingOver 
-                    ? 'bg-accent/20 rounded-lg p-4' 
+                    ? 'bg-purple-50/50 dark:bg-purple-900/10 rounded-lg' 
                     : ''
                 }`}
               >
-                {columns.map((column, index) => (
-                  <ColumnComponent 
-                    key={column.id.toString()} 
-                    column={column} 
-                    index={index}
-                    newTaskTitle={newTaskTitle}
-                    setNewTaskTitle={setNewTaskTitle}
-                    handleCreateTask={handleCreateTask}
-                    deleteTaskMutation={deleteTaskMutation}
-                    deleteColumnMutation={deleteColumnMutation}
-                    columnToDelete={columnToDelete}
-                    setColumnToDelete={setColumnToDelete}
-                    columnColors={columnColors}
-                    setColumnColors={setColumnColors}
-                  />
+                {filteredColumns.map((column, index) => (
+                  <div key={column.id.toString()} className="flex-shrink-0">
+                    <ColumnComponent 
+                      column={column} 
+                      index={index}
+                      newTaskTitle={newTaskTitle}
+                      setNewTaskTitle={setNewTaskTitle}
+                      handleCreateTask={handleCreateTask}
+                      deleteTaskMutation={deleteTaskMutation}
+                      deleteColumnMutation={deleteColumnMutation}
+                      columnToDelete={columnToDelete}
+                      setColumnToDelete={setColumnToDelete}
+                    />
+                  </div>
                 ))}
                 {provided.placeholder}
 
                 {/* Add Column Input - Show input when adding new column */}
                 <div className="flex-shrink-0 w-72">
                   {showAddColumnInput ? (
-                    <div className="p-2 bg-secondary rounded-lg">
+                    <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
                       <Input
                         autoFocus
-                        placeholder="Enter column name..."
+                        placeholder="Enter list title..."
                         value={newColumnName}
                         onChange={(e) => setNewColumnName(e.target.value)}
-                        className="mb-2"
+                        className="text-sm mb-2"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && newColumnName.trim() !== "") {
                             createColumnMutation.mutate({ 
@@ -718,32 +700,34 @@ export default function BoardDetailPage() {
                               setShowAddColumnInput(false);
                             }
                           }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white h-8"
                           disabled={!newColumnName.trim()}
                         >
-                          Add Column
+                          Add List
                         </Button>
                         <Button 
                           size="sm" 
-                          variant="outline"
+                          variant="ghost"
+                          className="h-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                           onClick={() => {
                             setNewColumnName("");
                             setShowAddColumnInput(false);
                           }}
                         >
-                          Cancel
+                          <X className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <Button
                       variant="secondary"
-                      className="w-full h-12"
+                      className="w-full h-12 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                       onClick={() => {
                         setShowAddColumnInput(true);
                         setNewColumnName("");
                       }}
                     >
-                      <Plus className="mr-2 h-4 w-4" /> Add another column
+                      <Plus className="mr-2 h-4 w-4" /> Add another list
                     </Button>
                   )}
                 </div>

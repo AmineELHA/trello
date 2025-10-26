@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
-import { getGraphQLClient } from "../../lib/graphqlClient";
-import { REGISTER_USER } from "../../graphql/mutations";
 import {
   Card,
   CardHeader,
@@ -24,14 +21,13 @@ interface RegisterInput {
 }
 
 interface RegisterResponse {
-  signUp: {
-    user: {
-      id: string;
-      email: string;
-    };
-    token: string;
-    errors: string[];
+  success: boolean;
+  token?: string;
+  user?: {
+    id: string;
+    email: string;
   };
+  errors?: string[];
 }
 
 export default function RegisterPage() {
@@ -42,50 +38,70 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
   });
-  const [applicationErrors, setApplicationErrors] = useState<string[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const mutation = useMutation<RegisterResponse, Error, RegisterInput>({
-    mutationFn: async ({ email, password, firstName, lastName }) => {
-      const client = getGraphQLClient(); // dynamic client
-      return client.request<RegisterResponse>(REGISTER_USER, {
-        email,
-        password,
-        firstName,
-        lastName,
-      });
-    },
-    onSuccess: (res) => {
-      // Check for application-level errors in the response
-      if (res.signUp.errors && res.signUp.errors.length > 0) {
-        // Store application errors to display in UI
-        setApplicationErrors(res.signUp.errors);
+  // Check if user is already authenticated when the page loads
+  useEffect(() => {
+    const checkAuth = async () => {
+      // Check cookies by looking at document.cookie
+      if (document.cookie.includes('auth-token')) {
+        router.push("/boards");
       } else {
-        // Clear any previous application errors on success
-        setApplicationErrors([]);
-        
-        // Store user data and token for later use
-        if (res.signUp.token && res.signUp.user) {
-          localStorage.setItem("token", res.signUp.token);
-          
-          // Store user data to use in UserContext
-          const userData = {
-            id: res.signUp.user.id,
-            email: res.signUp.user.email,
-            firstName: formData.firstName, // Use form data since backend might not return full name
-            lastName: formData.lastName
-          };
-          localStorage.setItem("userData", JSON.stringify(userData));
+        // Check localStorage as fallback
+        const token = localStorage.getItem("token");
+        if (token) {
+          router.push("/boards");
         }
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrors([]);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data: RegisterResponse = await response.json();
+
+      if (!response.ok || data.errors) {
+        setErrors(data.errors || ["Registration failed"]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.success && data.token) {
+        // Set token in localStorage as fallback for client-side operations
+        localStorage.setItem("token", data.token);
         
+        // Store user data to use in UserContext
+        const userData = {
+          id: data.user?.id,
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        };
+        localStorage.setItem("userData", JSON.stringify(userData));
+
         // After successful registration, redirect to login page
         router.push("/auth/login");
       }
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutation.mutate(formData);
+    } catch (err) {
+      setErrors(["An error occurred during registration"]);
+      setIsLoading(false);
+      console.error(err);
+    }
   };
 
   return (
@@ -98,6 +114,11 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent>
+          {errors.length > 0 && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+              {errors.join(", ")}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="firstName">First Name</Label>
@@ -155,19 +176,12 @@ export default function RegisterPage() {
               />
             </div>
 
-            {mutation.isError && (
-              <p className="text-sm text-red-500">{mutation.error.message}</p>
-            )}
-            {applicationErrors.length > 0 && (
-              <p className="text-sm text-red-500">{applicationErrors.join(", ")}</p>
-            )}
-
             <Button
               type="submit"
               className="w-full"
-              disabled={mutation.isPending}
+              disabled={isLoading}
             >
-              {mutation.isPending ? "Registering..." : "Sign Up"}
+              {isLoading ? "Registering..." : "Sign Up"}
             </Button>
           </form>
         </CardContent>

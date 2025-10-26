@@ -1,15 +1,14 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
 import { useUser } from "../../app/contexts/UserContext";
 import { useSignOut } from "../../app/hooks/useSignOut";
-import { Button } from "./button";
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
-import { ChevronDown, LogOut, User } from "lucide-react";
+import { useTheme } from "../../app/contexts/ThemeContext";
+import { User, Mail, Settings, HelpCircle, LogOut, Sun, Moon, Camera } from "lucide-react";
+import { User as PhUser, EnvelopeSimple, GearSix, Question, SignOut, PencilSimple } from "phosphor-react";
 
 export default function UserProfileDropdown() {
   const { user, loading } = useUser();
   const { signOut, isLoading: isSigningOut } = useSignOut();
+  const { theme, toggleTheme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -36,47 +35,149 @@ export default function UserProfileDropdown() {
     return null;
   }
 
-  const fullName = `${user.firstName} ${user.lastName}`.trim();
+  const fullName = `${user.firstName} ${user.lastName}`.trim() || user.email;
   const initials = `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`.toUpperCase();
+
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    // Close the dropdown after changing theme
+    setIsOpen(false);
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="relative h-8 w-8 rounded-full"
+      {/* Profile section that toggles the menu */}
+      <div 
+        className="profile cursor-pointer flex justify-end items-center gap-3"
         onClick={toggleDropdown}
-        aria-expanded={isOpen}
-        aria-haspopup="true"
       >
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=0D8ABC&color=fff`} alt={fullName} />
-          <AvatarFallback className="bg-primary text-primary-foreground">
-            {initials || <User className="h-4 w-4" />}
-          </AvatarFallback>
-        </Avatar>
-        <span className="absolute -bottom-0.5 right-0 block h-2 w-2 rounded-full ring-2 ring-background bg-green-500" />
-        <ChevronDown className={`ml-1 h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-      </Button>
+        <div className="user text-right">
+          <h3 className="text-sm font-semibold m-0">{fullName}</h3>
+          <p className="text-xs opacity-60 m-0">@{user.username || user.email.split('@')[0]}</p>
+        </div>
+        <div className="img-box relative w-10 h-10 rounded-full overflow-hidden">
+          <img 
+            src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=0D8ABC&color=fff`} 
+            alt={fullName} 
+            className="absolute top-0 left-0 w-full h-full object-cover"
+          />
+        </div>
+      </div>
 
-      {isOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md border bg-background shadow-lg ring-1 ring-black/10 focus:outline-none">
-          <div className="px-4 py-3">
-            <p className="text-sm font-medium">{fullName || user.email}</p>
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-          </div>
-          <div className="py-1" role="none">
-            <button
-              onClick={signOut}
-              disabled={isSigningOut}
-              className="flex w-full items-center px-4 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              {isSigningOut ? 'Signing out...' : 'Sign out'}
-            </button>
+      {/* Dropdown menu */}
+      <div 
+        className={`menu absolute top-full right-4 w-64 min-h-[100px] bg-white shadow-lg rounded-lg overflow-hidden ${
+          isOpen 
+            ? 'opacity-100 transform translate-y-0 visible' 
+            : 'opacity-0 transform -translate-y-3 invisible'
+        } transition-all duration-300`}
+        style={{ marginTop: '24px' }}
+      >
+        {/* Dropdown arrow */}
+        <div className="absolute top-[-10px] right-[14px] w-5 h-5 bg-white transform rotate-45 z-[-1]"></div>
+        
+        {/* User profile header */}
+        <div className="px-5 py-4 border-b">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <img 
+                src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=0D8ABC&color=fff`} 
+                alt={fullName} 
+                className="w-12 h-12 rounded-full object-cover"
+              />
+              <button className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1 border-2 border-white">
+                <Camera className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-sm truncate">{fullName}</h3>
+                <button className="p-0.5 rounded hover:bg-gray-100">
+                  <PencilSimple weight="bold" className="w-3 h-3 text-gray-600" />
+                </button>
+              </div>
+              <p className="truncate text-xs text-gray-600">@{user.username || user.email.split('@')[0]}</p>
+            </div>
           </div>
         </div>
-      )}
+        
+        {/* Menu items */}
+        <div className="relative z-10 bg-white">
+          <ul className="py-2">
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center gap-2 px-5 py-3 text-sm text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                <PhUser weight="bold" className="w-4 h-4 text-gray-800" />
+                &nbsp;Profile
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center gap-2 px-5 py-3 text-sm text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                <EnvelopeSimple weight="bold" className="w-4 h-4 text-gray-800" />
+                &nbsp;Inbox
+              </a>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center gap-2 px-5 py-3 text-sm text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                <GearSix weight="bold" className="w-4 h-4 text-gray-800" />
+                &nbsp;Settings
+              </a>
+            </li>
+            <li className="pt-2">
+              <div className="px-5 py-1 text-xs text-gray-500 font-medium">APPEARANCE</div>
+              <div 
+                className={`flex items-center gap-2 px-5 py-3 text-sm cursor-pointer ${
+                  theme === 'light' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-800 hover:bg-gray-100'
+                } transition-colors`}
+                onClick={() => handleThemeChange('light')}
+              >
+                <Sun className={`w-4 h-4 ${theme === 'light' ? 'text-blue-600' : 'text-gray-800'}`} />
+                &nbsp;Light Mode
+              </div>
+              <div 
+                className={`flex items-center gap-2 px-5 py-3 text-sm cursor-pointer ${
+                  theme === 'dark' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'text-gray-800 hover:bg-gray-100'
+                } transition-colors`}
+                onClick={() => handleThemeChange('dark')}
+              >
+                <Moon className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-600' : 'text-gray-800'}`} />
+                &nbsp;Dark Mode
+              </div>
+            </li>
+            <li>
+              <a 
+                href="#" 
+                className="flex items-center gap-2 px-5 py-3 text-sm text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                <Question weight="bold" className="w-4 h-4 text-gray-800" />
+                &nbsp;Help
+              </a>
+            </li>
+            <li className="pt-2">
+              <button
+                onClick={signOut}
+                disabled={isSigningOut}
+                className="w-full flex items-center gap-2 px-5 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors text-left"
+              >
+                <SignOut weight="bold" className="w-4 h-4 text-red-500" />
+                &nbsp;Sign Out
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }

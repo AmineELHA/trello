@@ -18,6 +18,16 @@ export const useSignOut = () => {
         localStorage.removeItem("token");
       }
       
+      // Call the logout API to clear the cookie
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+        });
+      } catch (error) {
+        console.error('Error clearing auth cookie:', error);
+        // If API call fails, still proceed with client-side cleanup
+      }
+      
       // Additional cleanup can be done here if needed
       // For example, clearing other user data, cookies, etc.
       
