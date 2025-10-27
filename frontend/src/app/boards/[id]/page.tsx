@@ -1,278 +1,52 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { getGraphQLClient } from "../../lib/graphqlClient";
 import { CREATE_COLUMN, CREATE_TASK, REORDER_TASK, REORDER_COLUMN, DELETE_TASK, UPDATE_TASK, DELETE_COLUMN } from "../../graphql/mutations";
 import { GET_BOARD } from "../../graphql/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import useAuth from "../../hooks/useAuth";
-import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { Plus, Archive, Trash2, GripVertical, CheckCircle, Circle, MoreHorizontal, Edit3, X, Star, Lightbulb, Filter, Search, ArrowLeft } from "lucide-react";
-import { Card } from "@/components/ui/card";
-
-// Define TypeScript types first
-type ChecklistItem = {
-  id?: string;
-  description: string;
-  completed: boolean;
-};
-
-type Task = {
-  id: string;
-  title: string;
-  description?: string;
-  dueDate?: string;
-  labels?: string[];
-  checklists?: ChecklistItem[];
-  attachments?: string[];
-  position: number;
-};
-
-type Column = {
-  id: string;
-  name: string;
-  position: number;
-  tasks: Task[];
-};
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  KeyboardSensor,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverEvent,
+  UniqueIdentifier
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  SortableTask,
+  TaskDragOverlay,
+  SortableColumn,
+  ColumnDragOverlay,
+  type Task,
+  type Column
+} from "@/components/board/BoardComponents";
 
 type Board = {
   id: string;
   name: string;
   columns: Column[];
-};
-
-// Task Component using react-beautiful-dnd
-const TaskComponent = ({ 
-  task, 
-  index, 
-  deleteTaskMutation,
-  className = ""
-}: { 
-  task: Task; 
-  index: number; 
-  deleteTaskMutation: {
-    mutate: (variables: { id: string }) => void;
-    isPending?: boolean;
-  };
-  className?: string;
-}) => {
-  return (
-    <Draggable draggableId={task.id} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          {...provided.dragHandleProps}
-          className={`${snapshot.isDragging ? 'shadow-lg scale-[1.02] z-20' : 'hover:shadow-md'} transition-all duration-150 mb-2 ${className}`}
-        >
-          <Card className={`p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 ${snapshot.isDragging ? 'opacity-90' : ''}`}>
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <GripVertical className="h-4 w-4" />
-                  </div>
-                  <h4 className="font-medium text-sm truncate">{task.title}</h4>
-                </div>
-                
-                {task.description && (
-                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-1 line-clamp-2 mb-2">{task.description}</p>
-                )}
-                
-                {task.labels && task.labels.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {task.labels.map((label, index) => (
-                      <span 
-                        key={index} 
-                        className="text-xs px-2 py-0.5 rounded-full bg-purple-500 text-white" 
-                      >
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                
-                {task.dueDate && (
-                  <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-6 w-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <Edit3 className="h-3 w-3" />
-                </Button>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="h-6 w-6 text-red-500 hover:text-red-700"
-                  onClick={() => {
-                    deleteTaskMutation.mutate({ id: task.id });
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-    </Draggable>
-  );
-};
-
-// Column Component using react-beautiful-dnd
-const ColumnComponent = ({ 
-  column, 
-  index,
-  newTaskTitle,
-  setNewTaskTitle,
-  handleCreateTask,
-  deleteTaskMutation,
-  deleteColumnMutation,
-  columnToDelete,
-  setColumnToDelete
-}: { 
-  column: Column; 
-  index: number;
-  newTaskTitle: { [key: string]: string };
-  setNewTaskTitle: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
-  handleCreateTask: (e: React.FormEvent, columnId: string) => void;
-  deleteTaskMutation: {
-    mutate: (variables: { id: string }) => void;
-    isPending?: boolean;
-  };
-  deleteColumnMutation: {
-    mutate: (variables: { id: string }) => void;
-    isPending?: boolean;
-  };
-  columnToDelete: string | null;
-  setColumnToDelete: React.Dispatch<React.SetStateAction<string | null>>;
-}) => {
-  const [showColumnOptions, setShowColumnOptions] = useState(false);
-
-  return (
-    <Draggable draggableId={column.id.toString()} index={index}>
-      {(provided, snapshot) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.draggableProps}
-          className={`flex flex-col w-72 ${snapshot.isDragging ? 'scale-[1.02] shadow-lg z-10' : ''} bg-gray-100 dark:bg-gray-800/50 rounded-lg`}
-        >
-          <div 
-            className="flex items-center justify-between p-3 rounded-t-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white"
-            {...provided.dragHandleProps}
-          >
-            <h3 className="font-semibold text-sm truncate">{column.name}</h3>
-            
-            <div className="flex gap-1">
-              <button 
-                className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
-                onClick={() => setShowColumnOptions(!showColumnOptions)}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-              
-              {showColumnOptions && (
-                <div className="absolute mt-8 bg-white dark:bg-gray-800 shadow-lg rounded-md p-1 z-20 right-3 w-48">
-                  <button 
-                    className="w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 flex items-center gap-2"
-                    onClick={() => setColumnToDelete(column.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete column
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <Droppable 
-            droppableId={column.id.toString()} 
-            type="TASK" 
-            isDropDisabled={false} 
-            isCombineEnabled={false} 
-            ignoreContainerClipping={false}
-            direction="vertical"
-          >
-            {(provided, snapshot) => (
-              <div
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-                className={`flex-1 min-h-[100px] overflow-y-auto p-2 rounded-b-lg ${
-                  snapshot.isDraggingOver 
-                    ? 'bg-purple-100/50 dark:bg-purple-900/20' 
-                    : 'bg-gray-100/50 dark:bg-gray-700/30'
-                }`}
-              >
-                {column.tasks && Array.isArray(column.tasks) ? 
-                  column.tasks.map((task, taskIndex) => (
-                    <div key={`${task.id}`} className="group">
-                      <TaskComponent 
-                        task={task} 
-                        index={taskIndex}
-                        deleteTaskMutation={deleteTaskMutation}
-                        className=""
-                      />
-                    </div>
-                  )) 
-                : []
-                }
-                {provided.placeholder}
-                
-                {/* Add Task Form */}
-                <form
-                  onSubmit={(e) => handleCreateTask(e, column.id)}
-                  className="mt-2 p-2 bg-gray-100 dark:bg-gray-700/50 rounded-lg"
-                >
-                  <Input
-                    placeholder="Enter a title for this card..."
-                    value={newTaskTitle[column.id] || ""}
-                    onChange={(e) => {
-                      setNewTaskTitle(prev => ({
-                        ...prev,
-                        [column.id]: e.target.value
-                      }));
-                    }}
-                    className="text-sm mb-2"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8">
-                      Add Card
-                    </Button>
-                    <Button 
-                      type="button" 
-                      size="sm" 
-                      variant="ghost"
-                      className="h-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                      onClick={() => {
-                        setNewTaskTitle(prev => ({
-                          ...prev,
-                          [column.id]: ""
-                        }));
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            )}
-          </Droppable>
-        </div>
-      )}
-    </Draggable>
-  );
 };
 
 export default function BoardDetailPage() {
@@ -445,30 +219,75 @@ export default function BoardDetailPage() {
     }));
   };
 
-  // Handle drag and drop with optimistic updates
-  const handleOnDragEnd = (result: DropResult) => {
-    const { destination, source, draggableId, type } = result;
+  // DndKit sensor configuration - hooks must be called at the top level without conditional logic
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8, // Minimum distance to trigger drag
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-    // If no destination, return
-    if (!destination) return;
-    
-    // If dropped in the same position, do nothing
-    if (
-      destination.droppableId === source.droppableId && 
-      destination.index === source.index
-    ) {
+  // Drag and drop state management
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const activeTask = useMemo(() => localColumns.flatMap(col => col.tasks).find(task => task.id === activeId), [localColumns, activeId]);
+  const activeColumn = useMemo(() => localColumns.find(column => column.id === activeId), [localColumns, activeId]);
+
+  // Handle drag start
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id);
+  };
+
+  // Handle drag over
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    // Only handle task reordering within columns for now
+    if (active.data.current?.type === 'Task' && over.data.current?.type === 'Column') {
+      // Task moving over a column - handle in drag end
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over) {
+      setActiveId(null);
       return;
     }
 
-    // Handle column reordering
-    if (type === 'COLUMN') {
-      // Optimistically update the UI
-      const newColumns = Array.from(localColumns);
-      const movedColumn = newColumns.find(col => col.id.toString() === draggableId);
-      
-      if (movedColumn) {
-        const [movedItem] = newColumns.splice(source.index, 1);
-        newColumns.splice(destination.index, 0, movedItem);
+    const activeId = active.id;
+    const overId = over.id;
+
+    // If dropped in the same position, do nothing
+    if (activeId === overId) {
+      setActiveId(null);
+      return;
+    }
+
+    // Determine the type of item being dragged
+    const activeType = active.data.current?.type;
+    const overType = over.data.current?.type;
+
+    if (activeType === "Column") {
+      // Handle column reordering
+      const oldIndex = localColumns.findIndex(col => col.id === activeId);
+      const newIndex = localColumns.findIndex(col => col.id === overId);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newColumns = arrayMove(localColumns, oldIndex, newIndex);
         
         // Update positions in the UI to reflect the new order
         newColumns.forEach((col, idx) => {
@@ -479,54 +298,118 @@ export default function BoardDetailPage() {
         
         // Then send the mutation
         reorderColumnMutation.mutate({
-          column_id: draggableId,
-          new_position: destination.index + 1
+          column_id: activeId as string,
+          new_position: newIndex + 1
         });
       }
-      return;
-    }
-
-    // Get the source and destination columns to properly handle position updates
-    const sourceColumn = localColumns.find(col => col.id.toString() === source.droppableId);
-    const destColumn = localColumns.find(col => col.id.toString() === destination.droppableId);
-
-    if (!sourceColumn || !destColumn) return;
-
-    // Handle task reordering
-    if (source.droppableId === destination.droppableId) {
-      // Moving task within the same column - optimistic update
-      const newColumns = Array.from(localColumns);
-      const sourceColIndex = newColumns.findIndex(col => col.id.toString() === source.droppableId);
-      
-      if (sourceColIndex !== -1) {
-        const newSourceTasks = Array.from(newColumns[sourceColIndex].tasks);
-        const [movedTask] = newSourceTasks.splice(source.index, 1);
-        newSourceTasks.splice(destination.index, 0, movedTask);
-        
-        // Update positions in the UI to reflect the new order
-        newSourceTasks.forEach((task, idx) => {
-          task.position = idx + 1;
-        });
-        
-        newColumns[sourceColIndex].tasks = newSourceTasks;
-        setLocalColumns(newColumns);
-        
-        // Then send the mutation
-        reorderTaskMutation.mutate({
-          task_id: draggableId,
-          new_position: destination.index + 1
-        });
+    } else if (activeType === "Task") {
+      // Handle task reordering
+      if (!activeTask) {
+        setActiveId(null);
+        return;
       }
-    } else {
-      // Moving task to a different column - optimistic update
-      const newColumns = Array.from(localColumns);
-      const sourceColIndex = newColumns.findIndex(col => col.id.toString() === source.droppableId);
-      const destColIndex = newColumns.findIndex(col => col.id.toString() === destination.droppableId);
-      
-      if (sourceColIndex !== -1 && destColIndex !== -1) {
+
+      // Find the source column
+      let sourceColIndex = -1;
+      let sourceTaskIndex = -1;
+      for (let i = 0; i < localColumns.length; i++) {
+        const taskIndex = localColumns[i].tasks.findIndex(task => task.id === activeId);
+        if (taskIndex !== -1) {
+          sourceColIndex = i;
+          sourceTaskIndex = taskIndex;
+          break;
+        }
+      }
+
+      if (sourceColIndex === -1 || sourceTaskIndex === -1) {
+        setActiveId(null);
+        return;
+      }
+
+      // If dropped over a task (within same column or different column)
+      if (overType === "Task") {
+        // Find the destination column
+        let destColIndex = -1;
+        let destTaskIndex = -1;
+        for (let i = 0; i < localColumns.length; i++) {
+          const taskIndex = localColumns[i].tasks.findIndex(task => task.id === overId);
+          if (taskIndex !== -1) {
+            destColIndex = i;
+            destTaskIndex = taskIndex;
+            break;
+          }
+        }
+
+        if (destColIndex === -1 || destTaskIndex === -1) {
+          setActiveId(null);
+          return;
+        }
+
+        if (sourceColIndex === destColIndex) {
+          // Moving task within the same column
+          const newColumns = [...localColumns];
+          const newTasks = arrayMove(newColumns[sourceColIndex].tasks, sourceTaskIndex, destTaskIndex);
+          
+          // Update positions in the UI to reflect the new order
+          newTasks.forEach((task, idx) => {
+            task.position = idx + 1;
+          });
+          
+          newColumns[sourceColIndex].tasks = newTasks;
+          setLocalColumns(newColumns);
+          
+          // Then send the mutation
+          reorderTaskMutation.mutate({
+            task_id: activeId as string,
+            new_position: destTaskIndex + 1
+          });
+        } else {
+          // Moving task to a different column
+          const newColumns = [...localColumns];
+          
+          // Remove task from source column
+          const sourceTasks = [...newColumns[sourceColIndex].tasks];
+          const [movedTask] = sourceTasks.splice(sourceTaskIndex, 1);
+          
+          // Update positions in source column
+          sourceTasks.forEach((task, idx) => {
+            task.position = idx + 1;
+          });
+          
+          newColumns[sourceColIndex].tasks = sourceTasks;
+          
+          // Add task to destination column
+          const destTasks = [...newColumns[destColIndex].tasks];
+          destTasks.splice(destTaskIndex, 0, { ...movedTask, position: destTaskIndex + 1 });
+          
+          // Update positions in destination column
+          destTasks.forEach((task, idx) => {
+            task.position = idx + 1;
+          });
+          
+          newColumns[destColIndex].tasks = destTasks;
+          setLocalColumns(newColumns);
+          
+          // Then send the mutation
+          reorderTaskMutation.mutate({
+            task_id: activeId as string,
+            new_column_id: newColumns[destColIndex].id,
+            new_position: destTaskIndex + 1
+          });
+        }
+      } else if (overType === "Column") {
+        // Moving task to another column
+        const destColIndex = localColumns.findIndex(col => col.id === overId);
+        if (destColIndex === -1) {
+          setActiveId(null);
+          return;
+        }
+
+        const newColumns = [...localColumns];
+        
         // Remove task from source column
-        const sourceTasks = Array.from(newColumns[sourceColIndex].tasks);
-        const [movedTask] = sourceTasks.splice(source.index, 1);
+        const sourceTasks = [...newColumns[sourceColIndex].tasks];
+        const [movedTask] = sourceTasks.splice(sourceTaskIndex, 1);
         
         // Update positions in source column
         sourceTasks.forEach((task, idx) => {
@@ -536,8 +419,7 @@ export default function BoardDetailPage() {
         newColumns[sourceColIndex].tasks = sourceTasks;
         
         // Add task to destination column
-        const destTasks = Array.from(newColumns[destColIndex].tasks);
-        destTasks.splice(destination.index, 0, { ...movedTask, position: destination.index + 1 });
+        const destTasks = [...newColumns[destColIndex].tasks, { ...movedTask, position: newColumns[destColIndex].tasks.length + 1 }];
         
         // Update positions in destination column
         destTasks.forEach((task, idx) => {
@@ -549,12 +431,14 @@ export default function BoardDetailPage() {
         
         // Then send the mutation
         reorderTaskMutation.mutate({
-          task_id: draggableId,
-          new_column_id: destination.droppableId,
-          new_position: destination.index + 1
+          task_id: activeId as string,
+          new_column_id: newColumns[destColIndex].id,
+          new_position: newColumns[destColIndex].tasks.length
         });
       }
     }
+
+    setActiveId(null);
   };
 
   // Filter columns based on search term
@@ -634,107 +518,127 @@ export default function BoardDetailPage() {
         </div>
 
         {/* Board Content */}
-        <DragDropContext onDragEnd={handleOnDragEnd}>
-          <Droppable droppableId="board" direction="horizontal" type="COLUMN" isDropDisabled={false} isCombineEnabled={false} ignoreContainerClipping={false}>
-            {(provided, snapshot) => (
-              <div 
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-                className={`flex gap-4 overflow-x-auto pb-4 transition-colors duration-200 p-2 ${
-                  snapshot.isDraggingOver 
-                    ? 'bg-purple-50/50 dark:bg-purple-900/10 rounded-lg' 
-                    : ''
-                }`}
-              >
-                {filteredColumns.map((column, index) => (
-                  <div key={column.id.toString()} className="flex-shrink-0">
-                    <ColumnComponent 
-                      column={column} 
-                      index={index}
-                      newTaskTitle={newTaskTitle}
-                      setNewTaskTitle={setNewTaskTitle}
-                      handleCreateTask={handleCreateTask}
-                      deleteTaskMutation={deleteTaskMutation}
-                      deleteColumnMutation={deleteColumnMutation}
-                      columnToDelete={columnToDelete}
-                      setColumnToDelete={setColumnToDelete}
-                    />
-                  </div>
-                ))}
-                {provided.placeholder}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          {/* SortableContext for columns */}
+          <SortableContext items={filteredColumns.map(column => column.id)} strategy={horizontalListSortingStrategy} type="Column">
+            <div 
+              className={`flex gap-4 overflow-x-auto pb-4 transition-colors duration-200 p-2`}
+            >
+              {filteredColumns.map((column) => (
+                <div key={column.id} className="flex-shrink-0" data-id={column.id} data-type="Column">
+                  <SortableColumn 
+                    column={column}
+                    newTaskTitle={newTaskTitle}
+                    setNewTaskTitle={setNewTaskTitle}
+                    handleCreateTask={handleCreateTask}
+                    deleteTaskMutation={deleteTaskMutation}
+                    deleteColumnMutation={deleteColumnMutation}
+                    columnToDelete={columnToDelete}
+                    setColumnToDelete={setColumnToDelete}
+                  />
+                </div>
+              ))}
 
-                {/* Add Column Input - Show input when adding new column */}
-                <div className="flex-shrink-0 w-72">
-                  {showAddColumnInput ? (
-                    <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-                      <Input
-                        autoFocus
-                        placeholder="Enter list title..."
-                        value={newColumnName}
-                        onChange={(e) => setNewColumnName(e.target.value)}
-                        className="text-sm mb-2"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newColumnName.trim() !== "") {
+              {/* Add Column Input - Show input when adding new column */}
+              <div className="flex-shrink-0 w-72">
+                {showAddColumnInput ? (
+                  <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                    <Input
+                      autoFocus
+                      placeholder="Enter list title..."
+                      value={newColumnName}
+                      onChange={(e) => setNewColumnName(e.target.value)}
+                      className="text-sm mb-2"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newColumnName.trim() !== "") {
+                          createColumnMutation.mutate({ 
+                            name: newColumnName.trim(), 
+                            board_id: parseInt(boardId as string) 
+                          });
+                          setNewColumnName("");
+                          setShowAddColumnInput(false);
+                        } else if (e.key === 'Escape') {
+                          setNewColumnName("");
+                          setShowAddColumnInput(false);
+                        }
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        onClick={() => {
+                          if (newColumnName.trim() !== "") {
                             createColumnMutation.mutate({ 
                               name: newColumnName.trim(), 
                               board_id: parseInt(boardId as string) 
                             });
                             setNewColumnName("");
                             setShowAddColumnInput(false);
-                          } else if (e.key === 'Escape') {
-                            setNewColumnName("");
-                            setShowAddColumnInput(false);
                           }
                         }}
-                      />
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          onClick={() => {
-                            if (newColumnName.trim() !== "") {
-                              createColumnMutation.mutate({ 
-                                name: newColumnName.trim(), 
-                                board_id: parseInt(boardId as string) 
-                              });
-                              setNewColumnName("");
-                              setShowAddColumnInput(false);
-                            }
-                          }}
-                          className="bg-blue-600 hover:bg-blue-700 text-white h-8"
-                          disabled={!newColumnName.trim()}
-                        >
-                          Add List
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          className="h-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                          onClick={() => {
-                            setNewColumnName("");
-                            setShowAddColumnInput(false);
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-8"
+                        disabled={!newColumnName.trim()}
+                      >
+                        Add List
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="h-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        onClick={() => {
+                          setNewColumnName("");
+                          setShowAddColumnInput(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      className="w-full h-12 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                      onClick={() => {
-                        setShowAddColumnInput(true);
-                        setNewColumnName("");
-                      }}
-                    >
-                      <Plus className="mr-2 h-4 w-4" /> Add another list
-                    </Button>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    className="w-full h-12 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    onClick={() => {
+                      setShowAddColumnInput(true);
+                      setNewColumnName("");
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Add another list
+                  </Button>
+                )}
               </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+            </div>
+          </SortableContext>
+          
+          {/* Drag Overlay - Shows the item being dragged */}
+          <DragOverlay>
+            {activeId ? (
+              activeTask ? (
+                <TaskDragOverlay
+                  task={activeTask}
+                  deleteTaskMutation={deleteTaskMutation}
+                />
+              ) : activeColumn ? (
+                <ColumnDragOverlay
+                  column={activeColumn}
+                  newTaskTitle={newTaskTitle}
+                  setNewTaskTitle={setNewTaskTitle}
+                  handleCreateTask={handleCreateTask}
+                  deleteTaskMutation={deleteTaskMutation}
+                  deleteColumnMutation={deleteColumnMutation}
+                  columnToDelete={columnToDelete}
+                  setColumnToDelete={setColumnToDelete}
+                />
+              ) : null
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </div>
   );
