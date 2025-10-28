@@ -3,15 +3,22 @@ import { NextResponse } from 'next/server';
 import { getGraphQLClient } from '../../../lib/graphqlClient';
 import { LOGIN_USER } from '../../../graphql/mutations';
 
+interface LoginResult {
+  login: {
+    token: string;
+    errors: string[];
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { email, password } = body;
 
     const client = getGraphQLClient();
-    const result = await client.request(LOGIN_USER, { email, password });
+    const result = await client.request<LoginResult>(LOGIN_USER, { email, password });
 
-    if (result.login.errors.length > 0) {
+    if (result.login.errors && result.login.errors.length > 0) {
       return NextResponse.json(
         { errors: result.login.errors },
         { status: 401 }

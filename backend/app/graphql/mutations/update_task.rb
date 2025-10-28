@@ -7,6 +7,7 @@ module Mutations
     argument :labels, [String], required: false
     argument :checklists, GraphQL::Types::JSON, required: false
     argument :attachments, [String], required: false
+    argument :color, String, required: false
     argument :column_id, ID, required: false
     argument :position, Integer, required: false
 
@@ -41,6 +42,7 @@ module Mutations
         labels: args[:labels] || task.labels,
         checklists: args[:checklists] || task.checklists,
         attachments: args[:attachments] || task.attachments,
+        color: args[:color] || task.color,
         position: args[:position] || task.position
       }
 

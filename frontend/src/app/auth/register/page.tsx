@@ -18,6 +18,7 @@ interface RegisterInput {
   password: string;
   firstName: string;
   lastName: string;
+  username: string;
 }
 
 interface RegisterResponse {
@@ -37,6 +38,7 @@ export default function RegisterPage() {
     password: "",
     firstName: "",
     lastName: "",
+    username: "",
   });
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +92,8 @@ export default function RegisterPage() {
           id: data.user?.id,
           email: formData.email,
           firstName: formData.firstName,
-          lastName: formData.lastName
+          lastName: formData.lastName,
+          username: formData.username
         };
         localStorage.setItem("userData", JSON.stringify(userData));
 
@@ -105,98 +108,126 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/20">
-      <Card className="w-full max-w-sm shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-center text-xl font-semibold">
-            Create an Account
-          </CardTitle>
-        </CardHeader>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Create an Account</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Join our community to get started
+          </p>
+        </div>
 
-        <CardContent>
-          {errors.length > 0 && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-              {errors.join(", ")}
-            </div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {errors.length > 0 && (
+          <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg">
+            {errors.join(", ")}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="firstName">First Name</Label>
+              <Label htmlFor="firstName" className="text-gray-700 dark:text-gray-300">First Name</Label>
               <Input
                 id="firstName"
                 type="text"
-                placeholder="Enter your first name"
+                placeholder="First name"
                 value={formData.firstName}
                 onChange={(e) =>
                   setFormData({ ...formData, firstName: e.target.value })
                 }
+                className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white"
                 required
               />
             </div>
 
             <div>
-              <Label htmlFor="lastName">Last Name</Label>
+              <Label htmlFor="lastName" className="text-gray-700 dark:text-gray-300">Last Name</Label>
               <Input
                 id="lastName"
                 type="text"
-                placeholder="Enter your last name"
+                placeholder="Last name"
                 value={formData.lastName}
                 onChange={(e) =>
                   setFormData({ ...formData, lastName: e.target.value })
                 }
+                className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white"
                 required
               />
             </div>
+          </div>
 
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                required
-              />
-            </div>
+          <div>
+            <Label htmlFor="username" className="text-gray-700 dark:text-gray-300">Username</Label>
+            <Input
+              id="username"
+              type="text"
+              placeholder="Username"
+              value={formData.username}
+              onChange={(e) =>
+                setFormData({ ...formData, username: e.target.value })
+              }
+              className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white w-full"
+              required
+            />
+          </div>
 
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                required
-              />
-            </div>
+          <div>
+            <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="Email address"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white w-full"
+              required
+            />
+          </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? "Registering..." : "Sign Up"}
-            </Button>
-          </form>
-        </CardContent>
+          <div>
+            <Label htmlFor="password" className="text-gray-700 dark:text-gray-300">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white w-full"
+              required
+            />
+          </div>
 
-        <CardFooter className="text-center text-sm text-muted-foreground">
+          <Button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 mt-4"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Creating Account...
+              </div>
+            ) : (
+              "Sign Up"
+            )}
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
           Already have an account?{" "}
           <button
             type="button"
             onClick={() => router.push("/auth/login")}
-            className="text-blue-600 hover:underline ml-1"
+            className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
           >
             Sign in
           </button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

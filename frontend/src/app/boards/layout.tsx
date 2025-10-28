@@ -26,13 +26,20 @@ const BoardLayout = ({ children }: { children: React.ReactNode }) => {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
 
+  interface BoardResponse {
+    boards: {
+      id: string;
+      name: string;
+    }[];
+  }
+
   // Fetch real boards from the database
   const { data: boards = [], isLoading } = useQuery({
     queryKey: ["boards"],
     queryFn: async () => {
       const client = getGraphQLClient();
-      const res = await client.request(GET_BOARDS);
-      return res.boards.map((board: any) => ({
+      const res = await client.request<BoardResponse>(GET_BOARDS);
+      return res.boards.map((board) => ({
         id: board.id,
         name: board.name,
         color: "bg-purple-500" // Default color, could be extended to store colors in DB
@@ -58,12 +65,12 @@ const BoardLayout = ({ children }: { children: React.ReactNode }) => {
       <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
         {/* Logo */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <div className="p-2 bg-blue-500 rounded-lg">
               <LayoutDashboard className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-bold text-gray-900 dark:text-white">Trello Clone</span>
-          </div>
+          </Link>
         </div>
 
 
@@ -154,15 +161,6 @@ const BoardLayout = ({ children }: { children: React.ReactNode }) => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Navigation */}
         <header className="h-14 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center px-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg border-0 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          
           <div className="ml-auto flex items-center gap-3">
             <UserProfileDropdown />
           </div>

@@ -1,0 +1,33 @@
+# fly.toml file for backend
+app = "trello-backend"
+primary_region = "ams"
+
+[build]
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[env]
+  RAILS_ENV = "production"
+  RAILS_LOG_LEVEL = "info"
+  DB_HOST = "trello-db.internal"
+  DB_NAME = "trello_backend"
+  DB_USERNAME = "postgres"
+  DB_PASSWORD = "postgres"
+  SECRET_KEY_BASE = "your-secret-key-base-here"
+  FRONTEND_URL = "https://trello-frontend.fly.dev"
+  RAILS_HOST = "trello-backend.fly.dev"
+  
+[[statics]]
+  guest_path = "/rails/public"
+  url_prefix = "/"

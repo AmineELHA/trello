@@ -29,7 +29,7 @@ module Types
     end
 
     # 🔹 Fetch a single board by ID
-    field :board, Types::BoardType, null: false do
+    field :board, Types::BoardType, null: true do
       description "Find a board by ID"
       argument :id, ID, required: true
     end
@@ -38,7 +38,7 @@ module Types
       user = context[:current_user]
       raise GraphQL::ExecutionError, "Not authenticated" unless user
 
-      user.boards.find(id)
+      user.boards.find_by(id: id)
     end
 
     # TODO: remove me (generated example)

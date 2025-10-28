@@ -8,6 +8,7 @@ import { GET_BOARD } from "../../graphql/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { type ChecklistItem } from "@/components/ui/checklist";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import useAuth from "../../hooks/useAuth";
@@ -24,7 +25,9 @@ import {
   DragEndEvent,
   DragStartEvent,
   DragOverEvent,
-  UniqueIdentifier
+  UniqueIdentifier,
+  pointerWithin,
+  rectIntersection
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -43,6 +46,14 @@ import {
   type Column
 } from "@/components/board/BoardComponents";
 
+interface BoardResponse {
+  board: {
+    id: string;
+    name: string;
+    columns: Column[];
+  };
+}
+
 type Board = {
   id: string;
   name: string;
@@ -55,19 +66,54 @@ export default function BoardDetailPage() {
   const boardId = params.id as string;
 
   const [newTaskTitle, setNewTaskTitle] = useState<{ [key: string]: string }>({});
+  const [newTaskColors, setNewTaskColors] = useState<{ [key: string]: string }>({});
   const [localColumns, setLocalColumns] = useState<Column[]>([]);
   const [newColumnName, setNewColumnName] = useState("");
   const [showAddColumnInput, setShowAddColumnInput] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+
+  // Drag and drop state management
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [activeDropContainerId, setActiveDropContainerId] = useState<string | null>(null);
+
+  // DndKit sensor configuration - hooks must be called at the top level without conditional logic
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8, // Minimum distance to trigger drag
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Memoized values for drag overlay
+  const activeTask = useMemo(() => {
+    if (!activeId) return null;
+    return localColumns.flatMap(col => col.tasks).find(task => task.id === activeId) || null;
+  }, [localColumns, activeId]);
+  
+  const activeColumn = useMemo(() => {
+    if (!activeId) return null;
+    return localColumns.find(column => column.id === activeId) || null;
+  }, [localColumns, activeId]);
 
   // Fetch board and columns
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["board", boardId],
     queryFn: async () => {
       const client = getGraphQLClient();
-      const res = await client.request(GET_BOARD, { id: boardId });
-      return res.board as Board;
+      const res = await client.request<BoardResponse>(GET_BOARD, { id: boardId });
+      return res.board;
     },
   });
 
@@ -97,7 +143,7 @@ export default function BoardDetailPage() {
 
   // Mutation to create a task
   const createTaskMutation = useMutation({
-    mutationFn: async (variables: { title: string; column_id: string }) => {
+    mutationFn: async (variables: { title: string; column_id: string; color?: string }) => {
       return await client.request(CREATE_TASK, variables);
     },
     onSuccess: () => {
@@ -172,6 +218,7 @@ export default function BoardDetailPage() {
       labels?: string[]; 
       checklists?: ChecklistItem[]; 
       attachments?: string[]; 
+      color?: string; 
       column_id?: string; 
       position?: number 
     }) => {
@@ -202,45 +249,25 @@ export default function BoardDetailPage() {
     },
   });
 
-  if (authLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading...</div>;
-
   const handleCreateTask = (e: React.FormEvent, columnId: string) => {
     e.preventDefault();
     if (!newTaskTitle[columnId]?.trim()) return;
     createTaskMutation.mutate({
       title: newTaskTitle[columnId],
       column_id: columnId,
+      color: newTaskColors[columnId] || undefined, // Pass undefined if no color selected
     });
     
-    // Clear the input field after creating the task
+    // Clear the input fields after creating the task
     setNewTaskTitle(prev => ({
       ...prev,
       [columnId]: ""
     }));
+    setNewTaskColors(prev => ({
+      ...prev,
+      [columnId]: ""
+    }));
   };
-
-  // DndKit sensor configuration - hooks must be called at the top level without conditional logic
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 8, // Minimum distance to trigger drag
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  // Drag and drop state management
-  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
-  const activeTask = useMemo(() => localColumns.flatMap(col => col.tasks).find(task => task.id === activeId), [localColumns, activeId]);
-  const activeColumn = useMemo(() => localColumns.find(column => column.id === activeId), [localColumns, activeId]);
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
@@ -253,15 +280,42 @@ export default function BoardDetailPage() {
 
     if (!over) return;
 
-    // Only handle task reordering within columns for now
+    const activeId = active.id;
+    const overId = over.id;
+
+    // If dragging a column over another column, we don't need to set active drop container
+    if (active.data.current?.type === 'Column' && over.data.current?.type === 'Column') {
+      return;
+    }
+
+    // If dragging over a column (for tasks)
     if (active.data.current?.type === 'Task' && over.data.current?.type === 'Column') {
-      // Task moving over a column - handle in drag end
+      setActiveDropContainerId(overId as string);
+    }
+    
+    // If dragging over a task in a different column
+    if (active.data.current?.type === 'Task' && over.data.current?.type === 'Task') {
+      const activeTask = localColumns.flatMap(col => col.tasks).find(task => task.id === activeId);
+      const overTask = localColumns.flatMap(col => col.tasks).find(task => task.id === overId);
+      
+      // Only handle if the tasks are in different columns
+      if (activeTask && overTask) {
+        const activeColumn = localColumns.find(col => col.tasks.some(t => t.id === activeId));
+        const overColumn = localColumns.find(col => col.tasks.some(t => t.id === overId));
+        
+        if (activeColumn && overColumn && activeColumn.id !== overColumn.id) {
+          setActiveDropContainerId(overColumn.id);
+        }
+      }
     }
   };
 
   // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+
+    // Clear the active drop container
+    setActiveDropContainerId(null);
 
     if (!over) {
       setActiveId(null);
@@ -282,24 +336,27 @@ export default function BoardDetailPage() {
     const overType = over.data.current?.type;
 
     if (activeType === "Column") {
-      // Handle column reordering
-      const oldIndex = localColumns.findIndex(col => col.id === activeId);
-      const newIndex = localColumns.findIndex(col => col.id === overId);
+      // Handle column reordering using DndKit's horizontalListSortingStrategy
+      const activeIndex = localColumns.findIndex(col => col.id === activeId);
+      const overIndex = localColumns.findIndex(col => col.id === overId);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newColumns = arrayMove(localColumns, oldIndex, newIndex);
+      if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+        // Perform the reordering
+        const newColumns = arrayMove(localColumns, activeIndex, overIndex);
         
         // Update positions in the UI to reflect the new order
-        newColumns.forEach((col, idx) => {
-          col.position = idx + 1;
-        });
+        const updatedColumns = newColumns.map((col, idx) => ({
+          ...col,
+          position: idx + 1
+        }));
         
-        setLocalColumns(newColumns);
+        setLocalColumns(updatedColumns);
         
-        // Then send the mutation
+        // Then send the mutation to update the backend
+        // The new_position represents where the column was moved to (1-indexed)
         reorderColumnMutation.mutate({
           column_id: activeId as string,
-          new_position: newIndex + 1
+          new_position: overIndex + 1
         });
       }
     } else if (activeType === "Task") {
@@ -418,7 +475,7 @@ export default function BoardDetailPage() {
         
         newColumns[sourceColIndex].tasks = sourceTasks;
         
-        // Add task to destination column
+        // Add task to destination column at the end
         const destTasks = [...newColumns[destColIndex].tasks, { ...movedTask, position: newColumns[destColIndex].tasks.length + 1 }];
         
         // Update positions in destination column
@@ -453,6 +510,8 @@ export default function BoardDetailPage() {
       }))
     : localColumns;
 
+  // Now we check for auth loading after all hooks have been called
+  if (authLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading...</div>;
   if (isLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading board...</div>;
   if (error) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Error loading board: {error instanceof Error ? error.message : 'Unknown error'}</div>;
   if (!data) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Board not found</div>;
@@ -465,41 +524,18 @@ export default function BoardDetailPage() {
         {/* Header */}
         <div className="flex justify-between items-center mb-6 py-2 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
-            <div>
-              <Link href="/boards" className="flex items-center gap-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 text-sm mb-1">
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Boards</span>
-              </Link>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{data.name}</h1>
-                <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
-                  Private
-                </span>
-              </div>
-            </div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{data.name}</h1>
+            <span className="text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded">
+              Private
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Member avatars */}
-            <div className="flex -space-x-2">
-              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium border-2 border-white dark:border-gray-800">
-                U
-              </div>
-              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-medium border-2 border-white dark:border-gray-800">
-                T
-              </div>
-            </div>
-            
-            {/* Action icons */}
-            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <Star className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <Lightbulb className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-              <Filter className="h-4 w-4" />
-            </Button>
-            
+            <Link href="/boards">
+              <Button variant="outline" className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                <span>Back to Boards</span>
+              </Button>
+            </Link>
             {/* Search bar */}
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -510,10 +546,6 @@ export default function BoardDetailPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
-            <Button variant="outline" className="border-gray-300 dark:border-gray-600 dark:text-white dark:hover:bg-gray-800">
-              Share
-            </Button>
           </div>
         </div>
 
@@ -526,7 +558,7 @@ export default function BoardDetailPage() {
           onDragEnd={handleDragEnd}
         >
           {/* SortableContext for columns */}
-          <SortableContext items={filteredColumns.map(column => column.id)} strategy={horizontalListSortingStrategy} type="Column">
+          <SortableContext items={filteredColumns.map(column => column.id)} strategy={horizontalListSortingStrategy}>
             <div 
               className={`flex gap-4 overflow-x-auto pb-4 transition-colors duration-200 p-2`}
             >
@@ -535,12 +567,17 @@ export default function BoardDetailPage() {
                   <SortableColumn 
                     column={column}
                     newTaskTitle={newTaskTitle}
+                    newTaskColors={newTaskColors}
                     setNewTaskTitle={setNewTaskTitle}
+                    setNewTaskColors={setNewTaskColors}
                     handleCreateTask={handleCreateTask}
                     deleteTaskMutation={deleteTaskMutation}
+                    updateTaskMutation={updateTaskMutation}
+                    setEditingTaskId={setEditingTaskId}
                     deleteColumnMutation={deleteColumnMutation}
                     columnToDelete={columnToDelete}
                     setColumnToDelete={setColumnToDelete}
+                    isActiveDropContainer={activeDropContainerId === column.id}
                   />
                 </div>
               ))}
@@ -618,27 +655,193 @@ export default function BoardDetailPage() {
           
           {/* Drag Overlay - Shows the item being dragged */}
           <DragOverlay>
-            {activeId ? (
-              activeTask ? (
-                <TaskDragOverlay
-                  task={activeTask}
-                  deleteTaskMutation={deleteTaskMutation}
-                />
-              ) : activeColumn ? (
-                <ColumnDragOverlay
-                  column={activeColumn}
-                  newTaskTitle={newTaskTitle}
-                  setNewTaskTitle={setNewTaskTitle}
-                  handleCreateTask={handleCreateTask}
-                  deleteTaskMutation={deleteTaskMutation}
-                  deleteColumnMutation={deleteColumnMutation}
-                  columnToDelete={columnToDelete}
-                  setColumnToDelete={setColumnToDelete}
-                />
-              ) : null
+            {activeId && activeTask ? (
+              <TaskDragOverlay
+                key="task-overlay"
+                task={activeTask}
+                deleteTaskMutation={deleteTaskMutation}
+                updateTaskMutation={updateTaskMutation}
+                setEditingTaskId={setEditingTaskId}
+              />
+            ) : activeId && activeColumn ? (
+              <ColumnDragOverlay
+                key="column-overlay"
+                column={activeColumn}
+                newTaskTitle={newTaskTitle}
+                newTaskColors={newTaskColors}
+                setNewTaskTitle={setNewTaskTitle}
+                setNewTaskColors={setNewTaskColors}
+                handleCreateTask={handleCreateTask}
+                deleteTaskMutation={deleteTaskMutation}
+                updateTaskMutation={updateTaskMutation}
+                setEditingTaskId={setEditingTaskId}
+                deleteColumnMutation={deleteColumnMutation}
+                columnToDelete={columnToDelete}
+                setColumnToDelete={setColumnToDelete}
+                isActiveDropContainer={activeDropContainerId === activeColumn.id}
+              />
             ) : null}
           </DragOverlay>
         </DndContext>
+        
+        {/* Confirmation Dialog for Column Deletion */}
+        {columnToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Delete Column</h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-6">
+                Are you sure you want to delete this column? All tasks in this column will also be deleted.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                  onClick={() => setColumnToDelete(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md"
+                  onClick={() => {
+                    deleteColumnMutation.mutate({ id: columnToDelete });
+                    setColumnToDelete(null);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Task Editing Modal */}
+        {editingTaskId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Edit Task</h3>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                // For now, just close the modal - in a real implementation you'd update the task
+                setEditingTaskId(null);
+              }}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Title
+                  </label>
+                  <Input
+                    type="text"
+                    className="w-full"
+                    defaultValue={localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId)?.title || ''}
+                    onChange={(e) => {
+                      // Update the task title in state
+                      setLocalColumns(prev => prev.map(col => ({
+                        ...col,
+                        tasks: col.tasks.map(task => 
+                          task.id === editingTaskId 
+                            ? {...task, title: e.target.value} 
+                            : task
+                        )
+                      })));
+                    }}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Description
+                  </label>
+                  <Input
+                    type="text"
+                    className="w-full"
+                    defaultValue={localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId)?.description || ''}
+                    onChange={(e) => {
+                      // Update the task description in state
+                      setLocalColumns(prev => prev.map(col => ({
+                        ...col,
+                        tasks: col.tasks.map(task => 
+                          task.id === editingTaskId 
+                            ? {...task, description: e.target.value} 
+                            : task
+                        )
+                      })));
+                    }}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Color
+                  </label>
+                  <div className="flex gap-2">
+                    {[
+                      'bg-red-200 dark:bg-red-600',
+                      'bg-blue-200 dark:bg-blue-600', 
+                      'bg-green-200 dark:bg-green-600',
+                      'bg-yellow-200 dark:bg-yellow-600',
+                      'bg-purple-200 dark:bg-purple-600',
+                      'bg-pink-200 dark:bg-pink-600'
+                    ].map((color) => {
+                      const currentTask = localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId);
+                      const isSelected = currentTask?.color === color;
+                      return (
+                        <button
+                          key={color}
+                          type="button"
+                          className={`w-8 h-8 rounded-full border ${color} ${isSelected ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-300' : ''}`}
+                          onClick={() => {
+                            // Update the task color in state
+                            setLocalColumns(prev => prev.map(col => ({
+                              ...col,
+                              tasks: col.tasks.map(task => 
+                                task.id === editingTaskId 
+                                  ? {...task, color} 
+                                  : task
+                              )
+                            })));
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+
+                
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                    onClick={() => {
+                      setEditingTaskId(null);
+                      // Reset to original values if needed
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md"
+                    onClick={() => {
+                      // Find the current task to get the updated values from the local state
+                      const updatedTask = localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId);
+                      if (updatedTask) {
+                        updateTaskMutation.mutate({
+                          id: editingTaskId,
+                          title: updatedTask.title,
+                          description: updatedTask.description,
+                          color: updatedTask.color,
+                          checklists: updatedTask.checklists
+                        });
+                      }
+                      setEditingTaskId(null);
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

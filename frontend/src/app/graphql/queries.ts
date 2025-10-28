@@ -26,6 +26,7 @@ export const GET_BOARD = gql`
           labels
           checklists
           attachments
+          color
           position
         }
       }

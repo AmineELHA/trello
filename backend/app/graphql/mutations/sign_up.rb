@@ -4,13 +4,14 @@ module Mutations
     argument :password, String, required: true
     argument :first_name, String, required: true
     argument :last_name, String, required: true
+    argument :username, String, required: true
 
     field :user, Types::UserType, null: true
     field :token, String, null: true
     field :errors, [ String ], null: false
 
-    def resolve(email:, password:, first_name:, last_name:)
-      user = User.new(email: email, password: password, password_confirmation: password, first_name: first_name, last_name: last_name)
+    def resolve(email:, password:, first_name:, last_name:, username:)
+      user = User.new(email: email, password: password, password_confirmation: password, first_name: first_name, last_name: last_name, username: username)
 
       if user.save
         token = generate_token(user)

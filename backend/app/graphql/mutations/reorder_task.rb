@@ -30,24 +30,58 @@ module Mutations
         return { task: nil, errors: ["Target column not found"] }
       end
 
-      # Move task to new column if needed
-      if new_column_id && new_column_id != task.column_id
-        task.column = target_column
+      # Wrap in transaction to ensure consistency
+      result = ActiveRecord::Base.transaction do
+        # Get the current position and column of the task
+        old_position = task.position
+        old_column = task.column
+
+        # Handle movement within the same column
+        if target_column == old_column && new_position != old_position
+          if new_position > old_position
+            # Moving to a higher position (e.g., from position 1 to 3)
+            # Shift tasks in between down by 1
+            target_column.tasks
+                    .where('position > ? AND position <= ?', old_position, new_position)
+                    .where.not(id: task.id)
+                    .update_all('position = position - 1')
+          else
+            # Moving to a lower position (e.g., from position 3 to 1)
+            # Shift tasks in between up by 1
+            target_column.tasks
+                    .where('position >= ? AND position < ?', new_position, old_position)
+                    .where.not(id: task.id)
+                    .update_all('position = position + 1')
+          end
+        # Handle movement to a different column
+        elsif new_column_id && new_column_id != task.column_id
+          # Shift tasks down in the target column at or after the new position (excluding the task being moved)
+          target_column.tasks.where('position >= ?', new_position).where.not(id: task.id).update_all('position = position + 1')
+          # Shift tasks down in the old column that were after the old position
+          old_column.tasks.where('position > ?', old_position).where.not(id: task.id).update_all('position = position - 1')
+          # Update the task's column
+          task.column = target_column
+        end
+        
+        # Set new position for the task
+        task.position = new_position
+
+        if task.save
+          { task: task, errors: [] }
+        else
+          # This will cause a rollback
+          raise ActiveRecord::Rollback, task.errors.full_messages.join(', ')
+        end
       end
 
-      # Update position - need to handle repositioning existing tasks
-      # First, shift other tasks down in the target column if they were at or after the new position
-      target_column.tasks.where('position >= ?', new_position).where.not(id: task.id).update_all('position = position + 1')
-      
-      # Set new position for the task
-      task.position = new_position
-
-      if task.save
-        { task: task, errors: [] }
-      else
-        # Rollback position changes if save fails
-        { task: nil, errors: task.errors.full_messages }
+      # If we get an exception from the transaction, return error
+      unless result.is_a?(Hash)
+        return { task: nil, errors: [result.to_s] }
       end
+
+      result
+    rescue ActiveRecord::Rollback => e
+      { task: nil, errors: [e.message] }
     end
   end
 end

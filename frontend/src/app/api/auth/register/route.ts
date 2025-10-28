@@ -3,17 +3,32 @@ import { NextResponse } from 'next/server';
 import { getGraphQLClient } from '../../../lib/graphqlClient';
 import { REGISTER_USER } from '../../../graphql/mutations';
 
+interface RegisterResult {
+  signUp: {
+    token: string;
+    user: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      username: string;
+    };
+    errors: string[];
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, firstName, lastName } = body;
+    const { email, password, firstName, lastName, username } = body;
 
     const client = getGraphQLClient();
-    const result = await client.request(REGISTER_USER, {
+    const result = await client.request<RegisterResult>(REGISTER_USER, {
       email,
       password,
       firstName,
       lastName,
+      username,
     });
 
     if (result.signUp.errors && result.signUp.errors.length > 0) {

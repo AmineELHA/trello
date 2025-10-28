@@ -1,13 +1,14 @@
 import { gql } from "graphql-request";
 
 export const REGISTER_USER = `
-mutation signUp($email: String!, $password: String!, $firstName: String!, $lastName: String!) {
-  signUp(input: { email: $email, password: $password, firstName: $firstName, lastName: $lastName }) {
+mutation signUp($email: String!, $password: String!, $firstName: String!, $lastName: String!, $username: String!) {
+  signUp(input: { email: $email, password: $password, firstName: $firstName, lastName: $lastName, username: $username }) {
     user {
       id
       email
       firstName
       lastName
+      username
     }
     token
     errors
@@ -110,8 +111,8 @@ export const REORDER_COLUMN = gql`
 `;
 
 export const CREATE_TASK = gql`
-  mutation CreateTask($title: String!, $column_id: ID!) {
-    createTask(input: { title: $title, columnId: $column_id }) {
+  mutation CreateTask($title: String!, $column_id: ID!, $color: String) {
+    createTask(input: { title: $title, columnId: $column_id, color: $color }) {
       task {
         id
         title
@@ -120,6 +121,7 @@ export const CREATE_TASK = gql`
         labels
         checklists
         attachments
+        color
         position
       }
       errors
@@ -128,7 +130,7 @@ export const CREATE_TASK = gql`
 `;
 
 export const UPDATE_TASK = gql`
-  mutation UpdateTask($id: ID!, $title: String, $description: String, $due_date: ISO8601DateTime, $labels: [String!], $checklists: JSON, $attachments: [String!], $column_id: ID, $position: Int) {
+  mutation UpdateTask($id: ID!, $title: String, $description: String, $due_date: ISO8601DateTime, $labels: [String!], $checklists: JSON, $attachments: [String!], $color: String, $column_id: ID, $position: Int) {
     updateTask(input: { 
       id: $id, 
       title: $title, 
@@ -137,6 +139,7 @@ export const UPDATE_TASK = gql`
       labels: $labels, 
       checklists: $checklists, 
       attachments: $attachments, 
+      color: $color, 
       columnId: $column_id, 
       position: $position
     }) {
@@ -148,6 +151,7 @@ export const UPDATE_TASK = gql`
         labels
         checklists
         attachments
+        color
         position
       }
       errors

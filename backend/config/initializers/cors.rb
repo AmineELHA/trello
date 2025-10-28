@@ -1,6 +1,6 @@
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins '*' # Allow all origins during development
+    origins ENV['FRONTEND_URL'] || '*' # Use environment variable for production
 
     resource '*',
       headers: :any,

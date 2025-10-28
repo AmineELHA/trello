@@ -5,14 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "../contexts/ThemeContext"; 
+import { useUser } from "../contexts/UserContext";
 import { Moon, Sun, Camera, User, Check, X } from "lucide-react";
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
-  const [userName, setUserName] = useState<string>("John Doe");
+  const { user, loading, refetchUser } = useUser();
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState<boolean>(false);
-  const [newName, setNewName] = useState<string>("John Doe");
+  const [newName, setNewName] = useState<string>(user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : '');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -31,12 +32,13 @@ export default function SettingsPage() {
   };
 
   const handleSaveName = () => {
-    setUserName(newName);
+    // In a real application, you would update the name via an API call
+    // For now, just update the local state
     setIsEditingName(false);
   };
 
   const handleCancelNameEdit = () => {
-    setNewName(userName);
+    setNewName(user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : '');
     setIsEditingName(false);
   };
 
@@ -118,14 +120,14 @@ export default function SettingsPage() {
                   ) : (
                     <div className="flex flex-col items-center">
                       <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {userName}
+                        {user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : 'User Name'}
                       </h2>
                       <Button
                         variant="ghost"
                         className="text-sm text-gray-500 dark:text-gray-400 mt-1 p-0 h-auto"
                         onClick={() => {
                           setIsEditingName(true);
-                          setNewName(userName);
+                          setNewName(user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : '');
                         }}
                       >
                         Edit name

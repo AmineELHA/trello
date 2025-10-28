@@ -8,6 +8,7 @@ module Types
     field :labels, [String], null: false, description: "Array of labels for the task"
     field :checklists, GraphQL::Types::JSON, null: false, description: "Array of checklist items"
     field :attachments, [String], null: false, description: "Array of attachment URLs or IDs"
+    field :color, String, null: true, description: "Color of the task"
     field :column, Types::ColumnType, null: true
   end
 end

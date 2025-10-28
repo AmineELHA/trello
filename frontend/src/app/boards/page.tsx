@@ -10,19 +10,26 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import useAuth from "../hooks/useAuth";
 import { Card } from "@/components/ui/card";
-import { Plus, LayoutDashboard, MoreHorizontal, Grid3X3, Users, Calendar, Search } from "lucide-react";
+import { Plus, LayoutDashboard, MoreHorizontal, Grid3X3, Calendar, Search } from "lucide-react";
 
 export default function BoardsPage() {
   const { loading: authLoading } = useAuth();
   const [boardName, setBoardName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
+  interface BoardResponse {
+    boards: {
+      id: string;
+      name: string;
+    }[];
+  }
+
   // Fetch all boards
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["boards"],
     queryFn: async () => {
       const client = getGraphQLClient();
-      const res = await client.request(GET_BOARDS);
+      const res = await client.request<BoardResponse>(GET_BOARDS);
       return res.boards;
     },
   });
@@ -176,10 +183,6 @@ export default function BoardsPage() {
                       <Calendar className="h-3 w-3" />
                       {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                      <Users className="h-3 w-3" />
-                      <span>3</span>
-                    </div>
                   </div>
                 </Card>
               </Link>
