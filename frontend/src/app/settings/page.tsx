@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useRef, ChangeEvent } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getGraphQLClient } from "../lib/graphqlClient";
+import { UPDATE_USER } from "../graphql/mutations";
 import { useTheme } from "../contexts/ThemeContext"; 
 import { useUser } from "../contexts/UserContext";
 import { Moon, Sun, Camera, User, Check, X } from "lucide-react";
@@ -12,9 +14,42 @@ export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
   const { user, loading, refetchUser } = useUser();
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
-  const [isEditingName, setIsEditingName] = useState<boolean>(false);
-  const [newName, setNewName] = useState<string>(user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : '');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const client = getGraphQLClient();
+
+  interface UpdateUserResponse {
+    updateUser: {
+      user: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+        username: string;
+        avatar?: string; // Added avatar field
+      } | null;
+      errors: string[];
+    };
+  }
+
+  // Mutation to update user profile (avatar only)
+  const updateUserMutation = useMutation<UpdateUserResponse, Error, { firstName?: string; lastName?: string; username?: string; avatar?: string }>({
+    mutationFn: async (variables) => {
+      return await client.request(UPDATE_USER, variables);
+    },
+    onSuccess: (data) => {
+      // Update user data in localStorage to reflect the changes immediately
+      if (data?.updateUser?.user) {
+        localStorage.setItem("userData", JSON.stringify(data.updateUser.user));
+      }
+      // Refetch user data to update the UI with new values
+      refetchUser();
+    },
+    onError: (error) => {
+      console.error("Error updating user:", error);
+      alert("Failed to update profile. Please try again.");
+    },
+  });
 
   const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -27,19 +62,19 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveAvatar = () => {
+    if (previewAvatar) {
+      // Update the user's avatar in the database
+      // In a real application, you would upload the image to a service like AWS S3, Cloudinary, etc.
+      // and then save the URL to the database
+      updateUserMutation.mutate({
+        avatar: previewAvatar
+      });
+    }
+  };
+
   const triggerFileInput = () => {
     fileInputRef.current?.click();
-  };
-
-  const handleSaveName = () => {
-    // In a real application, you would update the name via an API call
-    // For now, just update the local state
-    setIsEditingName(false);
-  };
-
-  const handleCancelNameEdit = () => {
-    setNewName(user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : '');
-    setIsEditingName(false);
   };
 
   return (
@@ -68,6 +103,12 @@ export default function SettingsPage() {
                         alt="Avatar preview" 
                         className="w-full h-full object-cover" 
                       />
+                    ) : user?.avatar ? (
+                      <img 
+                        src={user.avatar} 
+                        alt="User avatar" 
+                        className="w-full h-full object-cover" 
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
                         <User className="w-10 h-10" />
@@ -90,50 +131,40 @@ export default function SettingsPage() {
                     accept="image/*"
                     onChange={handleAvatarChange}
                   />
-                </div>
-
-                <div className="w-full max-w-xs">
-                  {isEditingName ? (
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        className="flex-1 text-center"
-                        autoFocus
-                      />
+                  {previewAvatar && (
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
                       <Button
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={handleSaveName}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
+                        type="button"
                         variant="outline"
                         size="icon"
-                        className="h-9 w-9"
-                        onClick={handleCancelNameEdit}
+                        className="rounded-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md"
+                        onClick={() => setPreviewAvatar(null)}
+                        disabled={updateUserMutation.isPending}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3 w-3 text-red-600" />
                       </Button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center">
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : 'User Name'}
-                      </h2>
                       <Button
-                        variant="ghost"
-                        className="text-sm text-gray-500 dark:text-gray-400 mt-1 p-0 h-auto"
-                        onClick={() => {
-                          setIsEditingName(true);
-                          setNewName(user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : '');
-                        }}
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 shadow-md"
+                        onClick={handleSaveAvatar}
+                        disabled={updateUserMutation.isPending}
                       >
-                        Edit name
+                        {updateUserMutation.isPending ? (
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <Check className="h-3 w-3 text-green-600" />
+                        )}
                       </Button>
                     </div>
                   )}
+                </div>
+
+                <div className="w-full max-w-xs flex flex-col items-center">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : 'User Name'}
+                  </h2>
                 </div>
               </div>
             </CardContent>

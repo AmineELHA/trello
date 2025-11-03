@@ -1,0 +1,66 @@
+# Kamal configuration for unified Trello clone deployment
+
+service: trello-unified
+
+image: your-dockerhub-username/trello-unified
+
+servers:
+  web:
+    - your-server-ip-or-hostname
+
+env:
+  clear:
+    RAILS_ENV: production
+    NODE_ENV: production
+    DB_HOST: localhost  # Since both are in the same container
+    DB_NAME: trello_production
+    DB_USERNAME: postgres
+    SECRET_KEY_BASE: your_secret_key_base
+    FRONTEND_URL: https://yourapp.com
+    RAILS_HOST: https://yourapp.com  # Same domain but different paths handled by nginx
+    NEXT_PUBLIC_GRAPHQL_ENDPOINT: https://yourapp.com/graphql
+  secret:
+    - DB_PASSWORD
+    - SECRET_KEY_BASE
+
+proxy:
+  ssl: true
+  host: yourapp.com  # Main domain handles both frontend and backend requests
+  port: 443
+
+volumes:
+  - "trello_backend_storage:/rails/storage"
+  - "trello_postgres_data:/var/lib/postgresql/data"
+
+builder:
+  dockerfile: Dockerfile.unified
+  context: .
+
+files:
+  - source: backend/config/database.yml
+    target: /backend/config/database.yml
+  - source: backend/config/master.key
+    target: /backend/config/master.key
+
+registries:
+  dockerhub:
+    username: your-dockerhub-username
+    password: <%= ENV["DOCKERHUB_PASSWORD"] %>
+
+accessories:
+  postgres:
+    image: postgres:15-alpine
+    roles: ["web"]
+    host: localhost
+    port: 5432
+    env:
+      clear:
+        POSTGRES_DB: trello_production
+        POSTGRES_USER: postgres
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - "trello_postgres_data:/var/lib/postgresql/data"
+    files:
+      - source: postgres-init.sql
+        target: /docker-entrypoint-initdb.d/init.sql

@@ -41,6 +41,23 @@ module Types
       user.boards.find_by(id: id)
     end
 
+    # 🔹 Fetch the current user
+    field :current_user, Types::UserType, null: true, description: "The currently authenticated user"
+
+    def current_user
+      context[:current_user]
+    end
+
+    # 🔹 Fetch notifications for the current user
+    field :notifications, [Types::NotificationType], null: false, description: "All notifications for the current user"
+
+    def notifications
+      user = context[:current_user]
+      raise GraphQL::ExecutionError, "Not authenticated" unless user
+
+      user.notifications.includes(:task).order(created_at: :desc)
+    end
+
     # TODO: remove me (generated example)
     field :test_field, String, null: false, description: "An example field added by the generator"
     def test_field

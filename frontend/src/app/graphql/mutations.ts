@@ -1,7 +1,7 @@
 import { gql } from "graphql-request";
 
-export const REGISTER_USER = `
-mutation signUp($email: String!, $password: String!, $firstName: String!, $lastName: String!, $username: String!) {
+export const REGISTER_USER = gql`
+mutation SignUp($email: String!, $password: String!, $firstName: String!, $lastName: String!, $username: String!) {
   signUp(input: { email: $email, password: $password, firstName: $firstName, lastName: $lastName, username: $username }) {
     user {
       id
@@ -111,13 +111,14 @@ export const REORDER_COLUMN = gql`
 `;
 
 export const CREATE_TASK = gql`
-  mutation CreateTask($title: String!, $column_id: ID!, $color: String) {
-    createTask(input: { title: $title, columnId: $column_id, color: $color }) {
+  mutation CreateTask($title: String!, $column_id: ID!, $color: String, $due_date: ISO8601DateTime, $reminder_date: ISO8601DateTime) {
+    createTask(input: { title: $title, columnId: $column_id, color: $color, dueDate: $due_date, reminderDate: $reminder_date }) {
       task {
         id
         title
         description
         dueDate
+        reminderDate
         labels
         checklists
         attachments
@@ -130,16 +131,18 @@ export const CREATE_TASK = gql`
 `;
 
 export const UPDATE_TASK = gql`
-  mutation UpdateTask($id: ID!, $title: String, $description: String, $due_date: ISO8601DateTime, $labels: [String!], $checklists: JSON, $attachments: [String!], $color: String, $column_id: ID, $position: Int) {
+  mutation UpdateTask($id: ID!, $title: String, $description: String, $due_date: ISO8601DateTime, $reminder_date: ISO8601DateTime, $labels: [String!], $checklists: JSON, $attachments: [String!], $color: String, $completed: Boolean, $column_id: ID, $position: Int) {
     updateTask(input: { 
       id: $id, 
       title: $title, 
       description: $description, 
       dueDate: $due_date, 
+      reminderDate: $reminder_date, 
       labels: $labels, 
       checklists: $checklists, 
       attachments: $attachments, 
       color: $color, 
+      completed: $completed, 
       columnId: $column_id, 
       position: $position
     }) {
@@ -148,10 +151,12 @@ export const UPDATE_TASK = gql`
         title
         description
         dueDate
+        reminderDate
         labels
         checklists
         attachments
         color
+        completed
         position
       }
       errors
@@ -183,6 +188,45 @@ export const REORDER_TASK = gql`
         }
         position
       }
+      errors
+    }
+  }
+`;
+
+export const UPDATE_USER = gql`
+  mutation UpdateUser($first_name: String, $last_name: String, $username: String, $avatar: String) {
+    updateUser(input: { firstName: $first_name, lastName: $last_name, username: $username, avatar: $avatar }) {
+      user {
+        id
+        email
+        firstName
+        lastName
+        username
+        avatar
+      }
+      errors
+    }
+  }
+`;
+
+export const MARK_NOTIFICATION_AS_READ = gql`
+  mutation MarkNotificationAsRead($id: ID!) {
+    markNotificationAsRead(input: { id: $id }) {
+      notification {
+        id
+        message
+        read
+        createdAt
+      }
+      errors
+    }
+  }
+`;
+
+export const MARK_ALL_NOTIFICATIONS_AS_READ = gql`
+  mutation MarkAllNotificationsAsRead {
+    markAllNotificationsAsRead {
+      success
       errors
     }
   }

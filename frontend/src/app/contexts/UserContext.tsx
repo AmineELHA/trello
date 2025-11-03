@@ -8,6 +8,8 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
+  username?: string;
+  avatar?: string;
 }
 
 interface UserContextType {
@@ -53,7 +55,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             id: decodedToken.user_id || decodedToken.sub || decodedToken.id,
             email: decodedToken.email,
             firstName: decodedToken.firstName || decodedToken.given_name || '',
-            lastName: decodedToken.lastName || decodedToken.family_name || ''
+            lastName: decodedToken.lastName || decodedToken.family_name || '',
+            username: decodedToken.username || decodedToken.preferred_username
           };
           setUser(userData);
           setLoading(false);

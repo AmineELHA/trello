@@ -21,6 +21,7 @@ import UserProfileDropdown from "@/components/ui/user-profile-dropdown";
 import { useQuery } from "@tanstack/react-query";
 import { getGraphQLClient } from "../lib/graphqlClient";
 import { GET_BOARDS } from "../graphql/queries";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 const BoardLayout = ({ children }: { children: React.ReactNode }) => {
   const { theme, toggleTheme } = useTheme();
@@ -34,7 +35,7 @@ const BoardLayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Fetch real boards from the database
-  const { data: boards = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["boards"],
     queryFn: async () => {
       const client = getGraphQLClient();
@@ -46,6 +47,8 @@ const BoardLayout = ({ children }: { children: React.ReactNode }) => {
       }));
     },
   });
+
+  const boards = Array.isArray(data) ? data : [];
 
   const workspaceName = "Kettle Studio";
 
@@ -162,6 +165,7 @@ const BoardLayout = ({ children }: { children: React.ReactNode }) => {
         {/* Top Navigation */}
         <header className="h-14 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center px-4">
           <div className="ml-auto flex items-center gap-3">
+            <NotificationBell />
             <UserProfileDropdown />
           </div>
         </header>

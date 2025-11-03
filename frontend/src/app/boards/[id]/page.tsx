@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGraphQLClient } from "../../lib/graphqlClient";
 import { CREATE_COLUMN, CREATE_TASK, REORDER_TASK, REORDER_COLUMN, DELETE_TASK, UPDATE_TASK, DELETE_COLUMN } from "../../graphql/mutations";
 import { GET_BOARD } from "../../graphql/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { type ChecklistItem } from "@/components/ui/checklist";
+import { type Task, type Column } from "@/components/board/BoardComponents";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import useAuth from "../../hooks/useAuth";
@@ -42,8 +44,6 @@ import {
   TaskDragOverlay,
   SortableColumn,
   ColumnDragOverlay,
-  type Task,
-  type Column
 } from "@/components/board/BoardComponents";
 
 interface BoardResponse {
@@ -61,18 +61,22 @@ type Board = {
 };
 
 export default function BoardDetailPage() {
-  const { loading: authLoading } = useAuth();
+  const queryClient = useQueryClient();
+  const { loading: authLoading, user } = useAuth();
   const params = useParams<{ id: string }>();
   const boardId = params.id as string;
 
   const [newTaskTitle, setNewTaskTitle] = useState<{ [key: string]: string }>({});
   const [newTaskColors, setNewTaskColors] = useState<{ [key: string]: string }>({});
+  const [newTaskDueDates, setNewTaskDueDates] = useState<{ [key: string]: string }>({});
+  const [newTaskReminderDates, setNewTaskReminderDates] = useState<{ [key: string]: string }>({});
   const [localColumns, setLocalColumns] = useState<Column[]>([]);
   const [newColumnName, setNewColumnName] = useState("");
   const [showAddColumnInput, setShowAddColumnInput] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTaskValues, setEditingTaskValues] = useState<Partial<Task> | null>(null);
 
   // Drag and drop state management
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -115,6 +119,7 @@ export default function BoardDetailPage() {
       const res = await client.request<BoardResponse>(GET_BOARD, { id: boardId });
       return res.board;
     },
+    enabled: !authLoading && !!user, // Only run the query when authenticated and auth is loaded
   });
 
   // Update local state when data changes
@@ -141,12 +146,34 @@ export default function BoardDetailPage() {
     },
   });
 
+  // Define the response type for CREATE_TASK mutation
+  type CreateTaskResponse = {
+    createTask?: {
+      task?: Task;
+      errors?: string[];
+    };
+  };
+
   // Mutation to create a task
-  const createTaskMutation = useMutation({
-    mutationFn: async (variables: { title: string; column_id: string; color?: string }) => {
+  const createTaskMutation = useMutation<CreateTaskResponse, Error, { 
+    title: string; 
+    column_id: string; 
+    color?: string;
+    due_date?: string;
+    reminder_date?: string;
+  }>({
+    mutationFn: async (variables) => {
       return await client.request(CREATE_TASK, variables);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Task creation response:', data);
+      // Check if there were errors even in the success callback
+      if (data.createTask?.errors && data.createTask.errors.length > 0) {
+        console.error("Task creation had errors:", data.createTask.errors);
+        alert("Task creation failed with errors: " + data.createTask.errors.join(", "));
+        return;
+      }
+      
       // Clear the input fields after successful creation
       setNewTaskTitle(prev => {
         const newTitles = { ...prev };
@@ -159,7 +186,7 @@ export default function BoardDetailPage() {
     },
     onError: (error) => {
       console.error("Error creating task:", error);
-      alert("Failed to create task. Please make sure you are logged in.");
+      alert("Failed to create task. Please make sure you are logged in. Error details: " + JSON.stringify(error));
     },
   });
 
@@ -215,6 +242,7 @@ export default function BoardDetailPage() {
       title?: string; 
       description?: string; 
       due_date?: string; 
+      reminder_date?: string; 
       labels?: string[]; 
       checklists?: ChecklistItem[]; 
       attachments?: string[]; 
@@ -224,9 +252,11 @@ export default function BoardDetailPage() {
     }) => {
       return await client.request(UPDATE_TASK, variables);
     },
-    onSuccess: () => {
-      // Refetch to sync with server state after a short delay
-      setTimeout(() => refetch(), 100);
+    onSuccess: (data, variables) => {
+      console.log('Task updated successfully:', data);
+      console.log('Variables sent:', variables);
+      // Immediately refetch to sync with server state
+      refetch();
     },
     onError: (error) => {
       console.error("Error updating task:", error);
@@ -252,10 +282,53 @@ export default function BoardDetailPage() {
   const handleCreateTask = (e: React.FormEvent, columnId: string) => {
     e.preventDefault();
     if (!newTaskTitle[columnId]?.trim()) return;
+    
+    // Prepare date values - convert to ISO string format if provided and not empty
+    let dueDate = undefined;
+    if (newTaskDueDates[columnId] && newTaskDueDates[columnId].trim() !== '') {
+      // The date is already in datetime format like 'YYYY-MM-DDTHH:MM'
+      const dueDateTime = new Date(newTaskDueDates[columnId]);
+      // Check if the date is valid before setting
+      if (!isNaN(dueDateTime.getTime())) {
+        dueDate = dueDateTime.toISOString();
+      }
+    }
+    
+    let reminderDate = undefined;
+    if (newTaskReminderDates[columnId] && newTaskReminderDates[columnId].trim() !== '') {
+      // The date is already in datetime format like 'YYYY-MM-DDTHH:MM'
+      let reminderDateTime = new Date(newTaskReminderDates[columnId]);
+      // Check if the date is valid before proceeding
+      if (isNaN(reminderDateTime.getTime())) {
+        reminderDateTime = new Date(); // Default to current date/time if invalid
+      }
+      
+      // Ensure reminder date is not after due date if both are provided
+      if (dueDate) {
+        const dueDateObj = new Date(dueDate);
+        if (reminderDateTime > dueDateObj) {
+          // If reminder date is after due date, show an error or adjust the time
+          alert("Reminder date cannot be after the due date. Please adjust your reminder time.");
+          return; // Prevent task creation
+        }
+      }
+      
+      reminderDate = reminderDateTime.toISOString();
+    }
+    
+    console.log('Creating task with values:', {
+      title: newTaskTitle[columnId],
+      column_id: columnId,
+      color: newTaskColors[columnId] || undefined,
+      due_date: dueDate,
+      reminder_date: reminderDate,
+    });
     createTaskMutation.mutate({
       title: newTaskTitle[columnId],
       column_id: columnId,
       color: newTaskColors[columnId] || undefined, // Pass undefined if no color selected
+      due_date: dueDate,
+      reminder_date: reminderDate,
     });
     
     // Clear the input fields after creating the task
@@ -264,6 +337,14 @@ export default function BoardDetailPage() {
       [columnId]: ""
     }));
     setNewTaskColors(prev => ({
+      ...prev,
+      [columnId]: ""
+    }));
+    setNewTaskDueDates(prev => ({
+      ...prev,
+      [columnId]: ""
+    }));
+    setNewTaskReminderDates(prev => ({
       ...prev,
       [columnId]: ""
     }));
@@ -512,6 +593,7 @@ export default function BoardDetailPage() {
 
   // Now we check for auth loading after all hooks have been called
   if (authLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading...</div>;
+  if (!user) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">You must be logged in to view this board.</div>;
   if (isLoading) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Loading board...</div>;
   if (error) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Error loading board: {error instanceof Error ? error.message : 'Unknown error'}</div>;
   if (!data) return <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">Board not found</div>;
@@ -568,12 +650,17 @@ export default function BoardDetailPage() {
                     column={column}
                     newTaskTitle={newTaskTitle}
                     newTaskColors={newTaskColors}
+                    newTaskDueDates={newTaskDueDates}
+                    newTaskReminderDates={newTaskReminderDates}
                     setNewTaskTitle={setNewTaskTitle}
                     setNewTaskColors={setNewTaskColors}
+                    setNewTaskDueDates={setNewTaskDueDates}
+                    setNewTaskReminderDates={setNewTaskReminderDates}
                     handleCreateTask={handleCreateTask}
                     deleteTaskMutation={deleteTaskMutation}
                     updateTaskMutation={updateTaskMutation}
                     setEditingTaskId={setEditingTaskId}
+                    setEditingTaskValues={setEditingTaskValues}
                     deleteColumnMutation={deleteColumnMutation}
                     columnToDelete={columnToDelete}
                     setColumnToDelete={setColumnToDelete}
@@ -662,6 +749,7 @@ export default function BoardDetailPage() {
                 deleteTaskMutation={deleteTaskMutation}
                 updateTaskMutation={updateTaskMutation}
                 setEditingTaskId={setEditingTaskId}
+                setEditingTaskValues={setEditingTaskValues}
               />
             ) : activeId && activeColumn ? (
               <ColumnDragOverlay
@@ -669,12 +757,17 @@ export default function BoardDetailPage() {
                 column={activeColumn}
                 newTaskTitle={newTaskTitle}
                 newTaskColors={newTaskColors}
+                newTaskDueDates={newTaskDueDates}
+                newTaskReminderDates={newTaskReminderDates}
                 setNewTaskTitle={setNewTaskTitle}
                 setNewTaskColors={setNewTaskColors}
+                setNewTaskDueDates={setNewTaskDueDates}
+                setNewTaskReminderDates={setNewTaskReminderDates}
                 handleCreateTask={handleCreateTask}
                 deleteTaskMutation={deleteTaskMutation}
                 updateTaskMutation={updateTaskMutation}
                 setEditingTaskId={setEditingTaskId}
+                setEditingTaskValues={setEditingTaskValues}
                 deleteColumnMutation={deleteColumnMutation}
                 columnToDelete={columnToDelete}
                 setColumnToDelete={setColumnToDelete}
@@ -732,15 +825,10 @@ export default function BoardDetailPage() {
                     className="w-full"
                     defaultValue={localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId)?.title || ''}
                     onChange={(e) => {
-                      // Update the task title in state
-                      setLocalColumns(prev => prev.map(col => ({
-                        ...col,
-                        tasks: col.tasks.map(task => 
-                          task.id === editingTaskId 
-                            ? {...task, title: e.target.value} 
-                            : task
-                        )
-                      })));
+                      setEditingTaskValues(prev => ({
+                        ...prev,
+                        title: e.target.value
+                      }));
                     }}
                   />
                 </div>
@@ -754,15 +842,176 @@ export default function BoardDetailPage() {
                     className="w-full"
                     defaultValue={localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId)?.description || ''}
                     onChange={(e) => {
-                      // Update the task description in state
-                      setLocalColumns(prev => prev.map(col => ({
-                        ...col,
-                        tasks: col.tasks.map(task => 
-                          task.id === editingTaskId 
-                            ? {...task, description: e.target.value} 
-                            : task
-                        )
-                      })));
+                      setEditingTaskValues(prev => ({
+                        ...prev,
+                        description: e.target.value
+                      }));
+                    }}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Due Date
+                  </label>
+                  <DateTimePicker
+                    date={editingTaskValues?.dueDate ? new Date(editingTaskValues.dueDate) : undefined}
+                    time={editingTaskValues?.dueDate ? new Date(editingTaskValues.dueDate).toTimeString().substring(0, 5) : undefined}
+                    onDateChange={(date) => {
+                      const timeValue = editingTaskValues?.dueDate ? 
+                        new Date(editingTaskValues.dueDate).toTimeString().substring(0, 5) : 
+                        '00:00';
+                      if (date) {
+                        // Format the date properly to create a valid datetime string
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const formattedDate = `${year}-${month}-${day}`;
+                        const combinedDateTime = new Date(`${formattedDate}T${timeValue}:00.000Z`);
+                        
+                        // Check if the date is valid before setting
+                        if (!isNaN(combinedDateTime.getTime())) {
+                          setEditingTaskValues(prev => ({
+                            ...prev,
+                            dueDate: combinedDateTime.toISOString()
+                          }));
+                        }
+                      } else {
+                        setEditingTaskValues(prev => ({
+                          ...prev,
+                          dueDate: null
+                        }));
+                      }
+                    }}
+                    onTimeChange={(time) => {
+                      let dateValue;
+                      if (editingTaskValues?.dueDate) {
+                        const dateObj = new Date(editingTaskValues.dueDate);
+                        // Check if the date is valid before extracting the date part
+                        if (!isNaN(dateObj.getTime())) {
+                          dateValue = dateObj.toISOString().split('T')[0];
+                        } else {
+                          dateValue = new Date().toISOString().split('T')[0];
+                        }
+                      } else {
+                        dateValue = new Date().toISOString().split('T')[0];
+                      }
+                      
+                      // When updating due date time, ensure it's after the reminder date
+                      let newDueDateTime = new Date(`${dateValue}T${time}:00.000Z`);
+                      
+                      // Check if the date is valid before proceeding
+                      if (isNaN(newDueDateTime.getTime())) {
+                        return; // Don't update if invalid date
+                      }
+                      
+                      if (editingTaskValues?.reminderDate) {
+                        const reminderDateTime = new Date(editingTaskValues.reminderDate);
+                        
+                        // Check if the date is valid before comparison
+                        if (isNaN(reminderDateTime.getTime())) {
+                          // Skip comparison if reminder date is invalid
+                          setEditingTaskValues(prev => ({
+                            ...prev,
+                            dueDate: newDueDateTime.toISOString()
+                          }));
+                          return;
+                        }
+                        
+                        // If the new due time would be before or equal to the reminder time, show an error
+                        if (newDueDateTime <= reminderDateTime) {
+                          alert("Due date/time must be after reminder date/time. Please adjust your dates.");
+                          return;
+                        }
+                      }
+                      
+                      setEditingTaskValues(prev => ({
+                        ...prev,
+                        dueDate: newDueDateTime.toISOString()
+                      }));
+                    }}
+                  />
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Reminder Date
+                  </label>
+                  <DateTimePicker
+                    date={editingTaskValues?.reminderDate ? new Date(editingTaskValues.reminderDate) : undefined}
+                    time={editingTaskValues?.reminderDate ? new Date(editingTaskValues.reminderDate).toTimeString().substring(0, 5) : undefined}
+                    onDateChange={(date) => {
+                      const timeValue = editingTaskValues?.reminderDate ? 
+                        new Date(editingTaskValues.reminderDate).toTimeString().substring(0, 5) : 
+                        '00:00';
+                      if (date) {
+                        // Format the date properly to create a valid datetime string
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const formattedDate = `${year}-${month}-${day}`;
+                        const combinedDateTime = new Date(`${formattedDate}T${timeValue}:00.000Z`);
+                        
+                        // Check if the date is valid before setting
+                        if (!isNaN(combinedDateTime.getTime())) {
+                          setEditingTaskValues(prev => ({
+                            ...prev,
+                            reminderDate: combinedDateTime.toISOString()
+                          }));
+                        }
+                      } else {
+                        setEditingTaskValues(prev => ({
+                          ...prev,
+                          reminderDate: null
+                        }));
+                      }
+                    }}
+                    onTimeChange={(time) => {
+                      let dateValue;
+                      if (editingTaskValues?.reminderDate) {
+                        const dateObj = new Date(editingTaskValues.reminderDate);
+                        // Check if the date is valid before extracting the date part
+                        if (!isNaN(dateObj.getTime())) {
+                          dateValue = dateObj.toISOString().split('T')[0];
+                        } else {
+                          dateValue = new Date().toISOString().split('T')[0];
+                        }
+                      } else {
+                        dateValue = new Date().toISOString().split('T')[0];
+                      }
+                      
+                      // When updating reminder time, ensure it's before the due date
+                      let newReminderDateTime = new Date(`${dateValue}T${time}:00.000Z`);
+                      
+                      // Check if the date is valid before proceeding
+                      if (isNaN(newReminderDateTime.getTime())) {
+                        return; // Don't update if invalid date
+                      }
+                      
+                      if (editingTaskValues?.dueDate) {
+                        const dueDateTime = new Date(editingTaskValues.dueDate);
+                        
+                        // Check if the date is valid before comparison
+                        if (isNaN(dueDateTime.getTime())) {
+                          // Skip comparison if due date is invalid
+                          setEditingTaskValues(prev => ({
+                            ...prev,
+                            reminderDate: newReminderDateTime.toISOString()
+                          }));
+                          return;
+                        }
+                        
+                        // If the new reminder time would be after or equal to the due time, show an error
+                        if (newReminderDateTime >= dueDateTime) {
+                          alert("Reminder date/time must be before due date/time. Please adjust your dates.");
+                          return;
+                        }
+                      }
+                      
+                      setEditingTaskValues(prev => ({
+                        ...prev,
+                        reminderDate: newReminderDateTime.toISOString()
+                      }));
                     }}
                   />
                 </div>
@@ -780,23 +1029,17 @@ export default function BoardDetailPage() {
                       'bg-purple-200 dark:bg-purple-600',
                       'bg-pink-200 dark:bg-pink-600'
                     ].map((color) => {
-                      const currentTask = localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId);
-                      const isSelected = currentTask?.color === color;
+                      const isSelected = editingTaskValues?.color === color;
                       return (
                         <button
                           key={color}
                           type="button"
                           className={`w-8 h-8 rounded-full border ${color} ${isSelected ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-300' : ''}`}
                           onClick={() => {
-                            // Update the task color in state
-                            setLocalColumns(prev => prev.map(col => ({
-                              ...col,
-                              tasks: col.tasks.map(task => 
-                                task.id === editingTaskId 
-                                  ? {...task, color} 
-                                  : task
-                              )
-                            })));
+                            setEditingTaskValues(prev => ({
+                              ...prev,
+                              color
+                            }));
                           }}
                         />
                       );
@@ -812,6 +1055,7 @@ export default function BoardDetailPage() {
                     className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
                     onClick={() => {
                       setEditingTaskId(null);
+                      setEditingTaskValues(null);
                       // Reset to original values if needed
                     }}
                   >
@@ -820,19 +1064,51 @@ export default function BoardDetailPage() {
                   <button
                     type="submit"
                     className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md"
-                    onClick={() => {
-                      // Find the current task to get the updated values from the local state
-                      const updatedTask = localColumns.flatMap(c => c.tasks).find(t => t.id === editingTaskId);
-                      if (updatedTask) {
-                        updateTaskMutation.mutate({
-                          id: editingTaskId,
-                          title: updatedTask.title,
-                          description: updatedTask.description,
-                          color: updatedTask.color,
-                          checklists: updatedTask.checklists
-                        });
+                    onClick={(e) => {
+                      e.preventDefault(); // Prevent form submission
+                      if (editingTaskValues && editingTaskId) {
+                        // Create the mutation variables object, only including defined values
+                        const mutationVariables: any = { id: editingTaskId };
+                        
+                        if (editingTaskValues.title !== undefined && editingTaskValues.title !== '') mutationVariables.title = editingTaskValues.title;
+                        if (editingTaskValues.description !== undefined && editingTaskValues.description !== '') mutationVariables.description = editingTaskValues.description;
+                        
+                        // Process date values to ensure they're in proper ISO format
+                        if (editingTaskValues.dueDate !== undefined) {
+                          if (editingTaskValues.dueDate) {
+                            const dueDateObj = new Date(editingTaskValues.dueDate);
+                            // Check if the date is valid before setting
+                            if (!isNaN(dueDateObj.getTime())) {
+                              mutationVariables.due_date = dueDateObj.toISOString();
+                            } else {
+                              mutationVariables.due_date = null; // or handle as needed
+                            }
+                          } else {
+                            mutationVariables.due_date = null;
+                          }
+                        }
+                        if (editingTaskValues.reminderDate !== undefined) {
+                          if (editingTaskValues.reminderDate) {
+                            const reminderDateObj = new Date(editingTaskValues.reminderDate);
+                            // Check if the date is valid before setting
+                            if (!isNaN(reminderDateObj.getTime())) {
+                              mutationVariables.reminder_date = reminderDateObj.toISOString();
+                            } else {
+                              mutationVariables.reminder_date = null; // or handle as needed
+                            }
+                          } else {
+                            mutationVariables.reminder_date = null;
+                          }
+                        }
+                        
+                        if (editingTaskValues.color !== undefined) mutationVariables.color = editingTaskValues.color;
+                        if (editingTaskValues.checklists !== undefined) mutationVariables.checklists = editingTaskValues.checklists;
+                        
+                        updateTaskMutation.mutate(mutationVariables);
                       }
+                      // Close the modal after mutation is called
                       setEditingTaskId(null);
+                      setEditingTaskValues(null);
                     }}
                   >
                     Save

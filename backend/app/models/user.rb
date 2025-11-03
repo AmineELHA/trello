@@ -6,7 +6,10 @@ class User < ApplicationRecord
          :recoverable, :rememberable, :validatable
          
   has_many :boards, dependent: :destroy
+  has_many :notifications, dependent: :destroy
   
+  validates :username, presence: true, uniqueness: { case_sensitive: false }, 
+            length: { minimum: 3, maximum: 20 }, on: :create
   validates :username, presence: true, uniqueness: { case_sensitive: false }, 
             length: { minimum: 3, maximum: 20 }
 end

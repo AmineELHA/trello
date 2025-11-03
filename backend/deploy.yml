@@ -1,0 +1,81 @@
+# Kamal configuration for the Trello backend (single-server deployment)
+
+service: trello-backend
+
+image: your-dockerhub-username/trello-backend
+
+# Single-server configuration - both backend and frontend on same server
+servers:
+  web:
+    - your-server-ip-or-hostname
+
+env:
+  clear:
+    RAILS_ENV: production
+    DB_HOST: your-db-host.com
+    DB_NAME: trello_production
+    DB_USERNAME: postgres
+    SECRET_KEY_BASE: your_secret_key_base
+    FRONTEND_URL: https://your-frontend-domain.com
+    RAILS_HOST: https://api.yourapp.com
+    # Additional environment variables for single-server deployment
+    RAILS_SERVE_STATIC_FILES: "true"
+    PORT: 3000
+  secret:
+    - DB_PASSWORD
+    - SECRET_KEY_BASE
+
+proxy:
+  ssl: true
+  host: api.yourapp.com  # API subdomain for the backend
+  # Port mapping for the single-server setup
+  port: 443
+  # Map the API subdomain to the backend service
+  hosts:
+    - api.yourapp.com
+
+volumes:
+  - "trello_backend_storage:/rails/storage"
+
+builder:
+  dockerfile: Dockerfile
+  context: .
+
+files:
+  - source: config/database.yml
+    target: /rails/config/database.yml
+  - source: config/master.key
+    target: /rails/config/master.key
+
+registries:
+  dockerhub:
+    username: your-dockerhub-username
+    password: <%= ENV["DOCKERHUB_PASSWORD"] %>
+
+# Additional configuration for single-server deployment
+accessories:
+  redis:
+    image: redis:7-alpine
+    roles: ["web"]
+    host: localhost
+    port: 6379
+    proxy:
+      port: 6379
+  postgres:
+    image: postgres:15-alpine
+    roles: ["web"]
+    host: localhost
+    port: 5432
+    proxy:
+      port: 5432
+    env:
+      clear:
+        POSTGRES_DB: trello_production
+        POSTGRES_USER: postgres
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - "trello_postgres_data:/var/lib/postgresql/data"
+    files:
+      - source: postgres-init.sql
+        target: /docker-entrypoint-initdb.d/init.sql

@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Plus, LayoutDashboard, MoreHorizontal, Grid3X3, Calendar, Search } from "lucide-react";
 
 export default function BoardsPage() {
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, user } = useAuth();
   const [boardName, setBoardName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -32,6 +32,7 @@ export default function BoardsPage() {
       const res = await client.request<BoardResponse>(GET_BOARDS);
       return res.boards;
     },
+    enabled: !authLoading && !!user, // Only run the query when authenticated and auth is loaded
   });
 
   const client = getGraphQLClient();
@@ -57,6 +58,12 @@ export default function BoardsPage() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
         <p className="mt-4 text-gray-600 dark:text-gray-300">Loading your boards...</p>
       </div>
+    </div>
+  );
+
+  if (!user) return (
+    <div className="flex justify-center items-center h-screen bg-gray-100 dark:bg-gray-900">
+      You must be logged in to view this page.
     </div>
   );
 

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useUser } from "../../app/contexts/UserContext";
 import { useSignOut } from "../../app/hooks/useSignOut";
 import { useTheme } from "../../app/contexts/ThemeContext";
-import { User, Settings, LogOut } from "lucide-react";
+import { User, Settings } from "lucide-react";
 import { SignOut } from "phosphor-react";
 import Link from "next/link";
 
@@ -49,32 +49,43 @@ export default function UserProfileDropdown() {
     <div className="relative" ref={dropdownRef}>
       {/* Profile section that toggles the menu */}
       <div 
-        className="profile cursor-pointer flex justify-end items-center gap-3"
+        className="profile cursor-pointer flex justify-end items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors"
         onClick={toggleDropdown}
       >
         <div className="user text-right">
           <h3 className="text-sm font-semibold m-0 text-gray-900 dark:text-white">{fullName}</h3>
-          <p className="text-xs opacity-60 m-0 text-gray-600 dark:text-gray-400">@{user.email.split('@')[0]}</p>
+          <p className="text-xs opacity-60 m-0 text-gray-600 dark:text-gray-400">@{user.username || user.email.split('@')[0]}</p>
         </div>
         <div className="img-box relative w-10 h-10 rounded-full overflow-hidden">
           <img 
-            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=0D8ABC&color=fff`} 
+            src={user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=0D8ABC&color=fff`} 
             alt={fullName} 
             className="absolute top-0 left-0 w-full h-full object-cover"
           />
+        </div>
+        {/* Dropdown indicator */}
+        <div className="indicator flex flex-col justify-center items-center">
+          <svg 
+            className={`w-4 h-4 text-gray-600 dark:text-gray-400 transform transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
 
       {/* Dropdown menu */}
       <div 
-        className={`menu absolute top-full right-0 w-64 min-h-[100px] bg-white dark:bg-gray-800 shadow-xl rounded-lg overflow-hidden z-[9999] ${
+        className={`menu absolute top-full right-0 w-64 bg-white dark:bg-gray-800 shadow-xl rounded-lg overflow-hidden z-[9999] ${
           isOpen 
-            ? 'opacity-100 transform translate-y-2 visible' 
-            : 'opacity-0 transform -translate-y-2 invisible'
-        } transition-all duration-300`}
+            ? 'opacity-100 transform translate-y-1 visible' 
+            : 'opacity-0 transform -translate-y-1 invisible'
+        } transition-all duration-200`}
       >
         {/* Dropdown arrow */}
-        <div className="absolute -top-2 right-4 w-5 h-5 bg-white dark:bg-gray-800 transform rotate-45 z-[9999]"></div>
+        <div className="absolute -top-2 right-5 w-5 h-5 bg-white dark:bg-gray-800 transform rotate-45 border-t border-l border-gray-200 dark:border-gray-700 z-[9998]"></div>
         
         {/* Menu items */}
         <div className="relative z-10 bg-white dark:bg-gray-800">

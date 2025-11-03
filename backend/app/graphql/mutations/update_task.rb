@@ -4,10 +4,12 @@ module Mutations
     argument :title, String, required: false
     argument :description, String, required: false
     argument :due_date, GraphQL::Types::ISO8601DateTime, required: false
+    argument :reminder_date, GraphQL::Types::ISO8601DateTime, required: false
     argument :labels, [String], required: false
     argument :checklists, GraphQL::Types::JSON, required: false
     argument :attachments, [String], required: false
     argument :color, String, required: false
+    argument :completed, Boolean, required: false
     argument :column_id, ID, required: false
     argument :position, Integer, required: false
 
@@ -35,16 +37,23 @@ module Mutations
       end
 
       # Update attributes if provided
-      task.attributes = {
-        title: args[:title] || task.title,
-        description: args[:description] || task.description,
-        due_date: args[:due_date] || task.due_date,
-        labels: args[:labels] || task.labels,
-        checklists: args[:checklists] || task.checklists,
-        attachments: args[:attachments] || task.attachments,
-        color: args[:color] || task.color,
-        position: args[:position] || task.position
+      update_attrs = {
+        title: args[:title],
+        description: args[:description],
+        due_date: args[:due_date],
+        reminder_date: args[:reminder_date],
+        labels: args[:labels],
+        checklists: args[:checklists],
+        attachments: args[:attachments],
+        color: args[:color],
+        completed: args[:completed],
+        position: args[:position]
       }
+      
+      # Only assign attributes that were provided
+      update_attrs.each do |key, value|
+        task[key] = value unless value.nil?
+      end
 
       if task.save
         { task: task, errors: [] }

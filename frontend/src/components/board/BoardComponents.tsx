@@ -14,11 +14,14 @@ import {
 import { 
   Input 
 } from "@/components/ui/input";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { 
   GripVertical, 
   MoreHorizontal, 
   Edit3, 
-  Trash2 
+  Trash2,
+  CheckCircle,
+  Circle
 } from "lucide-react";
 
 // Define TypeScript types first
@@ -32,13 +35,13 @@ export type Task = {
   id: string;
   title: string;
   description?: string;
-  dueDate?: string;
+  dueDate?: string | null;
+  reminderDate?: string | null;
   labels?: string[];
   checklists?: ChecklistItem[];
   attachments?: string[];
   color?: string;
   position: number;
-  completed?: boolean;
 };
 
 export type Column = {
@@ -76,17 +79,18 @@ interface SortableTaskProps {
       title?: string; 
       description?: string; 
       due_date?: string; 
+      reminder_date?: string; 
       labels?: string[]; 
       checklists?: ChecklistItem[]; 
       attachments?: string[]; 
       color?: string; 
       column_id?: string; 
       position?: number;
-      completed?: boolean;
     }) => void;
     isPending?: boolean;
   };
   setEditingTaskId: (id: string | null) => void;
+  setEditingTaskValues?: (values: Partial<Task> | null) => void;
   className?: string;
 }
 
@@ -95,6 +99,7 @@ export const SortableTask = ({
   deleteTaskMutation,
   updateTaskMutation,
   setEditingTaskId,
+  setEditingTaskValues,
   className = ""
 }: SortableTaskProps) => {
   const {
@@ -126,12 +131,12 @@ export const SortableTask = ({
       {...listeners}
       className={`cursor-grab active:cursor-grabbing ${isDragging ? 'shadow-lg scale-[1.02] z-20' : 'hover:shadow-md'} transition-all duration-150 mb-2 ${className}`}
     >
-      <Card className={`p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 ${isDragging ? 'opacity-90' : ''} ${task.completed ? 'opacity-70 bg-green-50 dark:bg-green-900/20' : ''} ${isValidColor(task.color) ? task.color : ''} border-l-4 ${(task.color && isValidColor(task.color)) ? task.color.replace(/bg-(\w+)-(\d+)/g, 'border-$1-$2') : 'border-gray-300 dark:border-gray-500'} group`}>
+      <Card className={`px-3 py-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 max-w-full w-full ${isDragging ? 'opacity-90' : ''} ${isValidColor(task.color) ? task.color : ''} border-l-2 ${(task.color && isValidColor(task.color)) ? task.color.replace(/bg-(\w+)-(\d+)/g, 'border-$1-$2') : 'border-gray-300 dark:border-gray-500'} group`}>
         <div className="flex items-start justify-between">
           <div className="flex items-center min-w-0 gap-2">
             <div className="flex-1">
               <div className="mb-2">
-                <h4 className={`font-medium text-sm truncate ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>{task.title}</h4>
+                <h4 className="font-medium text-sm truncate text-gray-900 dark:text-white">{task.title}</h4>
               </div>
               
 
@@ -141,7 +146,7 @@ export const SortableTask = ({
                   {task.labels.map((label, index) => (
                     <span 
                       key={index} 
-                      className={`text-xs px-2 py-0.5 rounded-full ${task.completed ? 'bg-gray-400 dark:bg-gray-600' : 'bg-purple-500'} text-white`} 
+                      className="text-xs px-2 py-0.5 rounded-full bg-purple-500 text-white" 
                     >
                       {label}
                     </span>
@@ -150,8 +155,13 @@ export const SortableTask = ({
               )}
               
               {task.dueDate && (
-                <div className={`flex items-center gap-1 text-xs ${task.completed ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'} mt-1`}>
-                  <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                </div>
+              )}
+              {task.reminderDate && (
+                <div className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 mt-1">
+                  <span>Reminder: {new Date(task.reminderDate).toLocaleDateString()}</span>
                 </div>
               )}
             </div>
@@ -164,6 +174,9 @@ export const SortableTask = ({
               className="h-6 w-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               onClick={(e) => {
                 e.stopPropagation(); // Prevent drag when clicking edit
+                if (setEditingTaskValues) {
+                  setEditingTaskValues(task);
+                }
                 setEditingTaskId(task.id);
               }}
             >
@@ -200,32 +213,34 @@ interface TaskDragOverlayProps {
       title?: string; 
       description?: string; 
       due_date?: string; 
+      reminder_date?: string; 
       labels?: string[]; 
       checklists?: ChecklistItem[]; 
       attachments?: string[]; 
       color?: string; 
       column_id?: string; 
-      position?: number;
-      completed?: boolean;
+      position?: number,
     }) => void;
     isPending?: boolean;
   };
   setEditingTaskId: (id: string | null) => void;
+  setEditingTaskValues?: (values: Partial<Task> | null) => void;
 }
 
 export const TaskDragOverlay = ({ 
   task, 
   deleteTaskMutation,
   updateTaskMutation,
-  setEditingTaskId
+  setEditingTaskId,
+  setEditingTaskValues
 }: TaskDragOverlayProps) => {
   return (
-    <Card className={`p-3 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg scale-[1.02] opacity-90 cursor-grab active:cursor-grabbing group ${isValidColor(task.color) ? task.color : ''} border-l-4 ${(task.color && isValidColor(task.color)) ? task.color.replace(/bg-(\w+)-(\d+)/g, 'border-$1-$2') : 'border-gray-300 dark:border-gray-500'} ${task.completed ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
+    <Card className={`px-3 py-2 bg-white dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 shadow-lg scale-[1.02] opacity-90 cursor-grab active:cursor-grabbing group ${isValidColor(task.color) ? task.color : ''} border-l-2 ${(task.color && isValidColor(task.color)) ? task.color.replace(/bg-(\w+)-(\d+)/g, 'border-$1-$2') : 'border-gray-300 dark:border-gray-500'}`}>
       <div className="flex items-start justify-between">
         <div className="flex items-center min-w-0 gap-2">
           <div className="flex-1">
             <div className="mb-2">
-              <h4 className={`font-medium text-sm truncate ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>{task.title}</h4>
+              <h4 className="font-medium text-sm truncate text-gray-900 dark:text-white">{task.title}</h4>
             </div>
             
 
@@ -235,7 +250,7 @@ export const TaskDragOverlay = ({
                 {task.labels.map((label, index) => (
                   <span 
                     key={index} 
-                    className={`text-xs px-2 py-0.5 rounded-full ${task.completed ? 'bg-gray-400 dark:bg-gray-600' : 'bg-purple-500'} text-white`} 
+                    className="text-xs px-2 py-0.5 rounded-full bg-purple-500 text-white" 
                   >
                     {label}
                   </span>
@@ -244,8 +259,13 @@ export const TaskDragOverlay = ({
             )}
             
             {task.dueDate && (
-              <div className={`flex items-center gap-1 text-xs ${task.completed ? 'text-gray-400 dark:text-gray-500' : 'text-gray-500 dark:text-gray-400'} mt-1`}>
-                <span>{new Date(task.dueDate).toLocaleDateString()}</span>
+              <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+              </div>
+            )}
+            {task.reminderDate && (
+              <div className="flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 mt-1">
+                <span>Reminder: {new Date(task.reminderDate).toLocaleDateString()}</span>
               </div>
             )}
           </div>
@@ -258,6 +278,9 @@ export const TaskDragOverlay = ({
             className="h-6 w-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             onClick={(e) => {
               e.stopPropagation(); // Prevent drag when clicking edit
+              if (setEditingTaskValues) {
+                setEditingTaskValues(task);
+              }
               setEditingTaskId(task.id);
             }}
           >
@@ -285,8 +308,12 @@ interface SortableColumnProps {
   column: Column;
   newTaskTitle: { [key: string]: string };
   newTaskColors: { [key: string]: string };
+  newTaskDueDates: { [key: string]: string };
+  newTaskReminderDates: { [key: string]: string };
   setNewTaskTitle: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
   setNewTaskColors: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
+  setNewTaskDueDates: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
+  setNewTaskReminderDates: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
   handleCreateTask: (e: React.FormEvent, columnId: string) => void;
   deleteTaskMutation: {
     mutate: (variables: { id: string }) => void;
@@ -298,6 +325,7 @@ interface SortableColumnProps {
       title?: string; 
       description?: string; 
       due_date?: string; 
+      reminder_date?: string; 
       labels?: string[]; 
       checklists?: ChecklistItem[]; 
       attachments?: string[]; 
@@ -307,6 +335,7 @@ interface SortableColumnProps {
     isPending?: boolean;
   };
   setEditingTaskId: (id: string | null) => void;
+  setEditingTaskValues?: (values: Partial<Task> | null) => void;
   deleteColumnMutation: {
     mutate: (variables: { id: string }) => void;
     isPending?: boolean;
@@ -320,12 +349,17 @@ export const SortableColumn = ({
   column,
   newTaskTitle,
   newTaskColors,
+  newTaskDueDates,
+  newTaskReminderDates,
   setNewTaskTitle,
   setNewTaskColors,
+  setNewTaskDueDates,
+  setNewTaskReminderDates,
   handleCreateTask,
   deleteTaskMutation,
   updateTaskMutation,
   setEditingTaskId,
+  setEditingTaskValues,
   deleteColumnMutation,
   columnToDelete,
   setColumnToDelete,
@@ -403,6 +437,7 @@ export const SortableColumn = ({
                   deleteTaskMutation={deleteTaskMutation}
                   updateTaskMutation={updateTaskMutation}
                   setEditingTaskId={setEditingTaskId}
+                  setEditingTaskValues={setEditingTaskValues}
                   className=""
                 />
               </div>
@@ -430,19 +465,117 @@ export const SortableColumn = ({
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs text-gray-600 dark:text-gray-400">Color:</span>
               <div className="flex gap-1">
-                {['bg-red-200', 'bg-blue-200', 'bg-green-200', 'bg-yellow-200', 'bg-purple-200', 'bg-pink-200'].map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`w-5 h-5 rounded-full border ${color} ${newTaskColors[column.id] === color ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
-                    onClick={() => {
-                      setNewTaskColors(prev => ({
+                {[
+                  'bg-red-200 dark:bg-red-600',
+                  'bg-blue-200 dark:bg-blue-600', 
+                  'bg-green-200 dark:bg-green-600',
+                  'bg-yellow-200 dark:bg-yellow-600',
+                  'bg-purple-200 dark:bg-purple-600',
+                  'bg-pink-200 dark:bg-pink-600'
+                ].map((color) => {
+                  const isSelected = newTaskColors[column.id] === color;
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`w-5 h-5 rounded-full border ${color} ${isSelected ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-300' : ''}`}
+                      onClick={() => {
+                        setNewTaskColors(prev => ({
+                          ...prev,
+                          [column.id]: color
+                        }));
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label className="text-xs text-gray-600 dark:text-gray-400">Due Date</label>
+                <DateTimePicker
+                  date={newTaskDueDates[column.id] ? new Date(newTaskDueDates[column.id]) : undefined}
+                  time={newTaskDueDates[column.id] ? new Date(newTaskDueDates[column.id]).toTimeString().substring(0, 5) : undefined}
+                  onDateChange={(date) => {
+                    const timePart = newTaskDueDates[column.id] ? new Date(newTaskDueDates[column.id]).toTimeString().substring(0, 5) : "00:00";
+                    if (date) {
+                      // Format the date properly to create a valid datetime string
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      const formattedDate = `${year}-${month}-${day}`;
+                      const combinedDateTime = new Date(`${formattedDate}T${timePart}`);
+                      
+                      // Check if the date is valid before setting
+                      if (!isNaN(combinedDateTime.getTime())) {
+                        setNewTaskDueDates(prev => ({
+                          ...prev,
+                          [column.id]: combinedDateTime.toISOString()
+                        }));
+                      }
+                    } else {
+                      setNewTaskDueDates(prev => ({
                         ...prev,
-                        [column.id]: color
+                        [column.id]: ""
                       }));
-                    }}
-                  />
-                ))}
+                    }
+                  }}
+                  onTimeChange={(time) => {
+                    const datePart = newTaskDueDates[column.id] ? new Date(newTaskDueDates[column.id]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                    const combinedDateTime = new Date(`${datePart}T${time}:00.000Z`);
+                    // Check if the date is valid before setting
+                    if (!isNaN(combinedDateTime.getTime())) {
+                      setNewTaskDueDates(prev => ({
+                        ...prev,
+                        [column.id]: combinedDateTime.toISOString()
+                      }));
+                    }
+                  }}
+                  className="text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-600 dark:text-gray-400">Reminder</label>
+                <DateTimePicker
+                  date={newTaskReminderDates[column.id] ? new Date(newTaskReminderDates[column.id]) : undefined}
+                  time={newTaskReminderDates[column.id] ? new Date(newTaskReminderDates[column.id]).toTimeString().substring(0, 5) : undefined}
+                  onDateChange={(date) => {
+                    const timePart = newTaskReminderDates[column.id] ? new Date(newTaskReminderDates[column.id]).toTimeString().substring(0, 5) : "00:00";
+                    if (date) {
+                      // Format the date properly to create a valid datetime string
+                      const year = date.getFullYear();
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      const formattedDate = `${year}-${month}-${day}`;
+                      const combinedDateTime = new Date(`${formattedDate}T${timePart}`);
+                      
+                      // Check if the date is valid before setting
+                      if (!isNaN(combinedDateTime.getTime())) {
+                        setNewTaskReminderDates(prev => ({
+                          ...prev,
+                          [column.id]: combinedDateTime.toISOString()
+                        }));
+                      }
+                    } else {
+                      setNewTaskReminderDates(prev => ({
+                        ...prev,
+                        [column.id]: ""
+                      }));
+                    }
+                  }}
+                  onTimeChange={(time) => {
+                    const datePart = newTaskReminderDates[column.id] ? new Date(newTaskReminderDates[column.id]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                    const combinedDateTime = new Date(`${datePart}T${time}:00.000Z`);
+                    // Check if the date is valid before setting
+                    if (!isNaN(combinedDateTime.getTime())) {
+                      setNewTaskReminderDates(prev => ({
+                        ...prev,
+                        [column.id]: combinedDateTime.toISOString()
+                      }));
+                    }
+                  }}
+                  className="text-xs"
+                />
               </div>
             </div>
             <div className="flex gap-2">
@@ -462,12 +595,17 @@ export const ColumnDragOverlay = ({
   column,
   newTaskTitle,
   newTaskColors,
+  newTaskDueDates,
+  newTaskReminderDates,
   setNewTaskTitle,
   setNewTaskColors,
+  setNewTaskDueDates,
+  setNewTaskReminderDates,
   handleCreateTask,
   deleteTaskMutation,
   updateTaskMutation,
   setEditingTaskId,
+  setEditingTaskValues,
   deleteColumnMutation,
   columnToDelete,
   setColumnToDelete,
@@ -517,6 +655,7 @@ export const ColumnDragOverlay = ({
                 deleteTaskMutation={deleteTaskMutation}
                 updateTaskMutation={updateTaskMutation}
                 setEditingTaskId={setEditingTaskId}
+                setEditingTaskValues={setEditingTaskValues}
               />
             </div>
           )) 
@@ -566,6 +705,36 @@ export const ColumnDragOverlay = ({
                   />
                 );
               })}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label className="text-xs text-gray-600 dark:text-gray-400">Due Date</label>
+              <Input
+                type="date"
+                value={newTaskDueDates[column.id] || ""}
+                onChange={(e) => {
+                  setNewTaskDueDates(prev => ({
+                    ...prev,
+                    [column.id]: e.target.value
+                  }));
+                }}
+                className="text-xs"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-gray-400">Reminder</label>
+              <Input
+                type="date"
+                value={newTaskReminderDates[column.id] || ""}
+                onChange={(e) => {
+                  setNewTaskReminderDates(prev => ({
+                    ...prev,
+                    [column.id]: e.target.value
+                  }));
+                }}
+                className="text-xs"
+              />
             </div>
           </div>
           <div className="flex gap-2">

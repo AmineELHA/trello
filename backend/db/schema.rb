@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_28_192434) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_30_135229) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -31,6 +31,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_28_192434) do
     t.index ["board_id"], name: "index_columns_on_board_id"
   end
 
+  create_table "notifications", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "task_id", null: false
+    t.text "message"
+    t.boolean "read", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["task_id"], name: "index_notifications_on_task_id"
+    t.index ["user_id"], name: "index_notifications_on_user_id"
+  end
+
   create_table "tasks", force: :cascade do |t|
     t.string "title"
     t.text "description"
@@ -43,7 +54,10 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_28_192434) do
     t.json "checklists", default: []
     t.string "attachments", default: [], array: true
     t.string "color"
+    t.boolean "completed", default: false
+    t.datetime "reminder_date"
     t.index ["column_id"], name: "index_tasks_on_column_id"
+    t.index ["completed"], name: "index_tasks_on_completed"
   end
 
   create_table "users", force: :cascade do |t|
@@ -57,6 +71,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_28_192434) do
     t.string "first_name"
     t.string "last_name"
     t.string "username"
+    t.string "avatar"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["username"], name: "index_users_on_username", unique: true
@@ -64,5 +79,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_28_192434) do
 
   add_foreign_key "boards", "users"
   add_foreign_key "columns", "boards"
+  add_foreign_key "notifications", "tasks"
+  add_foreign_key "notifications", "users"
   add_foreign_key "tasks", "columns"
 end

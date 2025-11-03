@@ -5,6 +5,7 @@ module Types
     # Auth mutations
     field :sign_up, mutation: Mutations::SignUp
     field :login, mutation: Mutations::Login
+    field :update_user, mutation: Mutations::UpdateUser
 
     # Board mutations
     field :create_board, mutation: Mutations::CreateBoard
@@ -22,6 +23,10 @@ module Types
     field :update_task, mutation: Mutations::UpdateTask
     field :delete_task, mutation: Mutations::DeleteTask
     field :reorder_task, mutation: Mutations::ReorderTask
+
+    # Notification mutations
+    field :mark_notification_as_read, mutation: Mutations::MarkNotificationAsRead
+    field :mark_all_notifications_as_read, mutation: Mutations::MarkAllNotificationsAsRead
 
   end
 end

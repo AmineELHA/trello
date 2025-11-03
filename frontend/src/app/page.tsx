@@ -8,6 +8,10 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { getGraphQLClient } from "./lib/graphqlClient";
+import { GET_BOARDS } from "./graphql/queries";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -71,8 +75,51 @@ export default function HomePage() {
     },
   ];
 
-  // Example boards data
-  const exampleBoards = [
+  // Define types for board data
+  interface Board {
+    id: string;
+    name: string;
+    columns: {
+      id: string;
+      tasks: {
+        id: string;
+      }[];
+    }[];
+  }
+
+  interface BoardsResponse {
+    boards: Board[];
+  }
+  
+  // Fetch user's boards if authenticated
+  const client = getGraphQLClient();
+  
+  const { data: boardsData, isLoading: boardsLoading } = useQuery<BoardsResponse>({
+    queryKey: ["boards"],
+    queryFn: async () => {
+      const res = await client.request<BoardsResponse>(GET_BOARDS);
+      return res;
+    },
+    enabled: isAuthenticated, // Only fetch if user is authenticated
+  });
+
+  // Calculate tasks count from the board data and assign random colors
+  const boardColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-red-500', 'bg-indigo-500', 'bg-pink-500', 'bg-teal-500'];
+  
+  const displayBoards = boardsData?.boards ? boardsData.boards.map((board: any, index: number) => {
+    // Count total tasks across all columns in the board
+    const totalTasks = board.columns.reduce((count: number, column: any) => {
+      return count + (column.tasks ? column.tasks.length : 0);
+    }, 0);
+    
+    return {
+      id: board.id,
+      name: board.name,
+      tasks: totalTasks,
+      members: 1, // Default to 1 since we don't track members yet
+      color: boardColors[index % boardColors.length]
+    };
+  }) : [
     {
       id: 1,
       name: "Project Roadmap",
@@ -107,113 +154,122 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur">
-        <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="p-2 bg-blue-500 rounded-lg">
-              <LayoutDashboard className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Trello Clone</span>
-          </Link>
+        <div className="w-full px-4 md:px-6">
+          <div className="flex h-16 items-center justify-between w-full">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <LayoutDashboard className="h-6 w-6 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900 dark:text-white">Trello Clone</span>
+            </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            {navItems.map((item, index) => (
-              <motion.div
-                key={item.name}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-              >
-                <Link
-                  href={item.href}
-                  className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors"
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center gap-6">
+              {navItems.map((item, index) => (
+                <motion.div
+                  key={item.name}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
                 >
-                  {item.name}
-                </Link>
-              </motion.div>
-            ))}
-          </nav>
+                  <Link
+                    href={item.href}
+                    className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors"
+                  >
+                    {item.name}
+                  </Link>
+                </motion.div>
+              ))}
+            </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            {authChecked ? (
-              isAuthenticated ? (
-                <>
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 }}
-                  >
-                    <Link href="/boards">
-                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                        View Boards
-                      </Button>
-                    </Link>
-                  </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.3 }}
-                  >
-                    <button 
-                      onClick={() => {
-                        localStorage.removeItem("token");
-                        router.push("/");
-                        setIsAuthenticated(false);
-                      }}
-                      className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 px-3 py-2 rounded-md transition-colors"
+            <div className="hidden md:flex items-center gap-3">
+              {authChecked ? (
+                isAuthenticated ? (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.2 }}
                     >
-                      Sign Out
-                    </button>
-                  </motion.div>
-                </>
+                      <Link href="/boards">
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                          View Boards
+                        </Button>
+                      </Link>
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.3 }}
+                    >
+                      <NotificationBell />
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.4 }}
+                    >
+                      <button 
+                        onClick={() => {
+                          localStorage.removeItem("token");
+                          router.push("/");
+                          setIsAuthenticated(false);
+                        }}
+                        className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 px-3 py-2 rounded-md transition-colors"
+                      >
+                        Sign Out
+                      </button>
+                    </motion.div>
+                  </>
+                ) : (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.2 }}
+                    >
+                      <Link href="/auth/login">
+                        <Button variant="ghost" className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400" onClick={(e) => {
+                          e.preventDefault();
+                          handleSignInClick();
+                        }}>Login</Button>
+                      </Link>
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: 0.3 }}
+                    >
+                      <Link href="/auth/register">
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">Sign Up Free</Button>
+                      </Link>
+                    </motion.div>
+                  </>
+                )
               ) : (
-                <>
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 }}
-                  >
-                    <Link href="/auth/login">
-                      <Button variant="ghost" className="text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400" onClick={(e) => {
-                        e.preventDefault();
-                        handleSignInClick();
-                      }}>Login</Button>
-                    </Link>
-                  </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.3 }}
-                  >
-                    <Link href="/auth/register">
-                      <Button className="bg-blue-600 hover:bg-blue-700 text-white">Sign Up Free</Button>
-                    </Link>
-                  </motion.div>
-                </>
-              )
-            ) : (
-              // Show loading state while checking auth
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Button variant="outline" disabled>
-                  Loading...
-                </Button>
-              </motion.div>
-            )}
-          </div>
+                // Show loading state while checking auth
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Button variant="outline" disabled>
+                    Loading...
+                  </Button>
+                </motion.div>
+              )}
+            </div>
 
-          {/* Mobile menu button */}
-          <motion.button
-            className="md:hidden p-2 rounded-md text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {mobileMenuOpen ? <X /> : <Menu />}
-          </motion.button>
+            {/* Mobile menu button */}
+            <motion.button
+              className="md:hidden p-2 rounded-md text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {mobileMenuOpen ? <X /> : <Menu />}
+            </motion.button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -225,55 +281,60 @@ export default function HomePage() {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="container py-4 flex flex-col gap-3 px-4">
-              {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 py-2 transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <div className="flex flex-col gap-2 pt-4 border-t">
-                {authChecked ? (
-                  isAuthenticated ? (
-                    <>
-                      <Link href="/boards">
-                        <Button variant="outline" className="w-full text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">View Boards</Button>
-                      </Link>
-                      <button 
-                        onClick={() => {
-                          localStorage.removeItem("token");
-                          router.push("/");
-                          setIsAuthenticated(false);
-                          setMobileMenuOpen(false); // Close mobile menu after sign out
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 rounded-md"
-                      >
-                        Sign Out
-                      </button>
-                    </>
+            <div className="w-full px-4 py-4">
+              <div className="flex flex-col gap-3">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 py-2 transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+                <div className="flex flex-col gap-2 pt-4 border-t">
+                  {authChecked ? (
+                    isAuthenticated ? (
+                      <>
+                        <Link href="/boards">
+                          <Button variant="outline" className="w-full text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400">View Boards</Button>
+                        </Link>
+                        <div className="px-4 py-2">
+                          <NotificationBell />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            localStorage.removeItem("token");
+                            router.push("/");
+                            setIsAuthenticated(false);
+                            setMobileMenuOpen(false); // Close mobile menu after sign out
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 rounded-md"
+                        >
+                          Sign Out
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Link href="/auth/login">
+                          <Button variant="outline" className="w-full text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400" onClick={(e) => {
+                            e.preventDefault();
+                            handleSignInClick();
+                          }}>Login</Button>
+                        </Link>
+                        <Link href="/auth/register">
+                          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">Sign Up Free</Button>
+                        </Link>
+                      </>
+                    )
                   ) : (
-                    <>
-                      <Link href="/auth/login">
-                        <Button variant="outline" className="w-full text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400" onClick={(e) => {
-                          e.preventDefault();
-                          handleSignInClick();
-                        }}>Login</Button>
-                      </Link>
-                      <Link href="/auth/register">
-                        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">Sign Up Free</Button>
-                      </Link>
-                    </>
-                  )
-                ) : (
-                  // Show loading state while checking auth
-                  <Button variant="outline" className="w-full" disabled>
-                    Loading...
-                  </Button>
-                )}
+                    // Show loading state while checking auth
+                    <Button variant="outline" className="w-full" disabled>
+                      Loading...
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -283,9 +344,9 @@ export default function HomePage() {
       <main>
         {/* Hero Section */}
         <section className="py-12 md:py-20">
-          <div className="container px-4 md:px-6">
+          <div className="w-full px-4 md:px-6">
             <motion.div 
-              className="flex flex-col items-center text-center space-y-8"
+              className="flex flex-col items-center text-center space-y-8 w-full"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
@@ -297,7 +358,7 @@ export default function HomePage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
                 <motion.h1 
-                  className="text-4xl md:text-6xl font-bold tracking-tight text-gray-900 dark:text-white"
+                  className="text-4xl md:text-6xl font-bold tracking-tight text-gray-900 dark:text-white max-w-3xl"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
@@ -305,7 +366,7 @@ export default function HomePage() {
                   Organize your projects, your way
                 </motion.h1>
                 <motion.p 
-                  className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl"
+                  className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.4 }}
@@ -369,7 +430,7 @@ export default function HomePage() {
                   </div>
                   
                   <div className="p-6 bg-white dark:bg-gray-800 rounded-b-lg">
-                    <div className="flex gap-4 flex-wrap">
+                    <div className="flex gap-4 flex-wrap justify-center">
                       {/* Board Example */}
                       <div className="flex-1 min-w-[200px] max-w-xs">
                         <div className="font-semibold mb-3 text-gray-700 dark:text-gray-300">To Do</div>
@@ -443,13 +504,13 @@ export default function HomePage() {
 
         {/* Features Section */}
         <section className="py-16 bg-white dark:bg-gray-900">
-          <div className="container px-4 md:px-6">
+          <div className="w-full px-4 md:px-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-center mb-12"
+              className="mb-12 w-full text-center"
             >
               <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">Powerful Features</h2>
               <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
@@ -457,7 +518,7 @@ export default function HomePage() {
               </p>
             </motion.div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 w-full">
               {features.map((feature, index) => (
                 <motion.div
                   key={index}
@@ -465,16 +526,17 @@ export default function HomePage() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
+                  className="flex justify-center"
                 >
-                  <Card className="border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow h-full bg-white dark:bg-gray-800">
+                  <Card className="border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow h-full bg-white dark:bg-gray-800 w-full max-w-sm">
                     <CardHeader>
-                      <div className="rounded-lg bg-blue-100 dark:bg-blue-900/30 p-3 w-12 h-12 flex items-center justify-center mb-4">
+                      <div className="rounded-lg bg-blue-100 dark:bg-blue-900/30 p-3 w-12 h-12 flex items-center justify-center mb-4 mx-auto">
                         <feature.icon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <CardTitle className="text-gray-900 dark:text-white">{feature.title}</CardTitle>
+                      <CardTitle className="text-gray-900 dark:text-white text-center">{feature.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-gray-600 dark:text-gray-300">{feature.description}</p>
+                      <p className="text-gray-600 dark:text-gray-300 text-center">{feature.description}</p>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -485,13 +547,13 @@ export default function HomePage() {
 
         {/* Example Boards Section */}
         <section className="py-16 bg-gray-50 dark:bg-gray-800/50">
-          <div className="container px-4 md:px-6">
+          <div className="w-full px-4 md:px-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-center mb-12"
+              className="mb-12 w-full text-center"
             >
               <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">See It In Action</h2>
               <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
@@ -499,32 +561,62 @@ export default function HomePage() {
               </p>
             </motion.div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {exampleBoards.map((board, index) => (
-                <motion.div
-                  key={board.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
-                >
-                  <MotionCard 
-                    className="border border-gray-200 dark:border-gray-700 transition-transform hover:scale-[1.02] h-full bg-white dark:bg-gray-800"
-                    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+              {boardsLoading ? (
+                // Show loading placeholders while fetching
+                Array.from({ length: 4 }).map((_, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: index * 0.1 }}
+                    className="flex justify-center"
                   >
-                    <div className={`${board.color} rounded-t-lg h-2`}></div>
-                    <CardHeader>
-                      <CardTitle className="text-lg text-gray-900 dark:text-white">{board.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-                        <span>{board.tasks} tasks</span>
-                        <span>{board.members} members</span>
-                      </div>
-                    </CardContent>
-                  </MotionCard>
-                </motion.div>
-              ))}
+                    <Card className="border border-gray-200 dark:border-gray-700 h-full bg-white dark:bg-gray-800 animate-pulse w-full max-w-sm">
+                      <div className="bg-gray-200 dark:bg-gray-700 rounded-t-lg h-2"></div>
+                      <CardHeader>
+                        <CardTitle className="text-lg text-gray-900 dark:text-white">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mx-auto"></div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                displayBoards.map((board, index) => (
+                  <motion.div
+                    key={board.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: index * 0.1 }}
+                    className="flex justify-center"
+                  >
+                    <MotionCard 
+                      className="border border-gray-200 dark:border-gray-700 transition-transform hover:scale-[1.02] h-full bg-white dark:bg-gray-800 w-full max-w-sm"
+                      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                    >
+                      <div className={`${board.color || 'bg-blue-500'} rounded-t-lg h-2`}></div>
+                      <CardHeader>
+                        <CardTitle className="text-lg text-gray-900 dark:text-white text-center">{board.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                          <span>{board.tasks || 0} tasks</span>
+                          <span>{board.members || 1} members</span>
+                        </div>
+                      </CardContent>
+                    </MotionCard>
+                  </motion.div>
+                ))
+              )}
             </div>
           </div>
         </section>
@@ -532,8 +624,8 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
-        <div className="container px-4 md:px-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="w-full px-4 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 w-full">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -602,7 +694,7 @@ export default function HomePage() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center"
+            className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center w-full"
           >
             <p className="text-sm text-gray-400 mb-4 md:mb-0">
               © 2025 Trello Clone. All rights reserved.

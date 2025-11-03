@@ -1,0 +1,41 @@
+# Multi-stage Dockerfile for unified deployment
+
+# Build stage for frontend
+FROM node:25-alpine AS frontend-build
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/. .
+RUN npm run build
+
+# Build stage for backend
+FROM ruby:3.4.5-alpine AS backend-build
+RUN apk add --no-cache build-base postgresql-dev
+
+WORKDIR /backend
+COPY backend/Gemfile backend/Gemfile.lock ./
+RUN bundle install
+COPY backend/. .
+
+# Production stage - just run the backend and serve Next.js build from it
+FROM ruby:3.4.5-alpine AS production
+
+RUN apk add --no-cache nodejs npm postgresql-client
+
+WORKDIR /backend
+COPY --from=backend-build /usr/local/bundle /usr/local/bundle
+COPY --from=backend-build /backend ./
+
+# Create public directory and copy Next.js build files there
+RUN mkdir -p public
+WORKDIR /app
+COPY --from=frontend-build /app/out ./
+
+WORKDIR /backend
+RUN cp -r /app/* public/
+
+# Expose port
+EXPOSE 8080
+
+# Start the Rails server
+CMD ["./bin/rails", "server", "-b", "0.0.0.0", "-p", "8080"]

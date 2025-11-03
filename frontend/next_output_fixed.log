@@ -1,0 +1,86 @@
+ ⚠ Port 3000 is in use, trying 3001 instead.
+   ▲ Next.js 14.0.0
+   - Local:        http://localhost:3001
+
+ ✓ Ready in 1527ms
+ ○ Compiling /not-found ...
+ ✓ Compiled /not-found in 1912ms (524 modules)
+ ○ Compiling /page ...
+ ✓ Compiled /page in 2s (1544 modules)
+ ○ Compiling /boards/[id]/page ...
+ ✓ Compiled /boards/[id]/page in 3.9s (4383 modules)
+ ⨯ Error: Cannot find module './vendor-chunks/graphql.js'
+Require stack:
+- /home/amine/projects/trello/frontend/.next/server/webpack-runtime.js
+- /home/amine/projects/trello/frontend/.next/server/app/boards/[id]/page.js
+- /home/amine/projects/trello/frontend/node_modules/next/dist/server/require.js
+- /home/amine/projects/trello/frontend/node_modules/next/dist/server/load-components.js
+- /home/amine/projects/trello/frontend/node_modules/next/dist/build/utils.js
+- /home/amine/projects/trello/frontend/node_modules/next/dist/server/dev/static-paths-worker.js
+- /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/jest-worker/processChild.js
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1419:15)
+    at /home/amine/projects/trello/frontend/node_modules/next/dist/server/require-hook.js:54:36
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1057:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1062:22)
+    at Module._load (node:internal/modules/cjs/loader:1225:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1502:12)
+    at mod.require (/home/amine/projects/trello/frontend/node_modules/next/dist/server/require-hook.js:64:28)
+    at require (node:internal/modules/helpers:152:16) {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/amine/projects/trello/frontend/.next/server/webpack-runtime.js',
+    '/home/amine/projects/trello/frontend/.next/server/app/boards/[id]/page.js',
+    '/home/amine/projects/trello/frontend/node_modules/next/dist/server/require.js',
+    '/home/amine/projects/trello/frontend/node_modules/next/dist/server/load-components.js',
+    '/home/amine/projects/trello/frontend/node_modules/next/dist/build/utils.js',
+    '/home/amine/projects/trello/frontend/node_modules/next/dist/server/dev/static-paths-worker.js',
+    '/home/amine/projects/trello/frontend/node_modules/next/dist/compiled/jest-worker/processChild.js'
+  ],
+  page: '/boards/15'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 783ms (4548 modules)
+ ○ Compiling /not-found ...
+ ✓ Compiled /not-found in 551ms (4553 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/home/amine/projects/trello/frontend/.next/server/app/page.js'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/page' in /home/amine/projects/trello/frontend/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/home/amine/projects/trello/frontend/.next/server/app/page.js', but to 'Error: Can't resolve '../../../../.next/server/app/page' in '/home/amine/projects/trello/frontend/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/page (expected /home/amine/projects/trello/frontend/.next/server/app/page.js)
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/server/require.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/server/require.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/server/load-components.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/utils.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-app-loader.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-app-loader.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/loader-runner/LoaderRunner.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/webpack/bundle5.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/compiled/webpack/webpack.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/plugins/define-env-plugin.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/swc/index.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/swc/index.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w>  at resolve commonjs /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-barrel-loader.js
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, lstat '/home/amine/projects/trello/frontend/.next/server/app/page.js'
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '../../../../.next/server/app/page' in /home/amine/projects/trello/frontend/node_modules/next/dist/server for build dependencies doesn't lead to expected result '/home/amine/projects/trello/frontend/.next/server/app/page.js', but to 'Error: Can't resolve '../../../../.next/server/app/page' in '/home/amine/projects/trello/frontend/node_modules/next/dist/server'' instead. Resolving dependencies are ignored for this path.
+<w>  at resolve commonjs file ../../../../.next/server/app/page (expected /home/amine/projects/trello/frontend/.next/server/app/page.js)
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/server/require.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/server/require.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/server/load-components.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/server/load-components.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/utils.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/utils.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/worker.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/worker.js
+<w>  at file dependencies /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at file /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+<w>  at resolve commonjs /home/amine/projects/trello/frontend/node_modules/next/dist/build/webpack/loaders/next-route-loader/index.js
+[?25h

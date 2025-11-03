@@ -1,0 +1,5 @@
+=> Booting Puma
+=> Rails 8.0.3 application starting in development 
+=> Run `bin/rails server --help` for more startup options
+A server is already running (pid: 9504, file: /home/amine/projects/trello/backend/tmp/pids/server.pid).
+Exiting

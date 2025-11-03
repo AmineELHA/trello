@@ -1,0 +1,44 @@
+# Multi-stage Dockerfile for unified deployment
+
+# Build stage for frontend
+FROM node:25-alpine AS frontend-build
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/. .
+RUN npm run build
+
+# Build stage for backend
+FROM ruby:3.4.5-alpine AS backend-build
+RUN apk add --no-cache build-base postgresql-dev
+
+WORKDIR /backend
+COPY backend/Gemfile backend/Gemfile.lock ./
+RUN bundle install
+COPY backend/. .
+
+# Production stage - run Nginx to serve both frontend and backend
+FROM nginx:alpine
+
+# Install Node.js and other dependencies in nginx image
+RUN apk add --no-cache nodejs npm ruby ruby-bundler postgresql-client
+
+WORKDIR /app
+COPY --from=frontend-build /app/.next/standalone ./standalone
+COPY --from=frontend-build /app/.next/static ./.next/static
+COPY --from=frontend-build /app/public ./public
+
+WORKDIR /backend
+COPY --from=backend-build /usr/local/bundle /usr/local/bundle
+COPY --from=backend-build /backend ./
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/entrypoint.sh"]

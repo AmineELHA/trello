@@ -1,0 +1,66 @@
+service: trello
+image: yourdockerhubusername/trello
+
+servers:
+  app:
+    hosts:
+      - 123.45.67.89   # your VPS IP
+
+env:
+  clear:
+    RAILS_ENV: production
+    NODE_ENV: production
+  secret:
+    RAILS_MASTER_KEY: your-master-key
+
+registry:
+  username: yourdockerhubusername
+  password: <%= ENV["DOCKER_PASSWORD"] %>
+
+builder:
+  dockerfile: Dockerfile
+  args:
+    NODE_ENV: production
+
+accessories:
+  db:
+    image: postgres:15
+    host: 123.45.67.89
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    host: 123.45.67.89
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+
+apps:
+  backend:
+    dir: backend
+    hosts:
+      - 123.45.67.89
+    env:
+      clear:
+        PORT: 3000
+    command: bundle exec puma -C config/puma.rb
+    ports:
+      - "3000:3000"
+
+  frontend:
+    dir: frontend
+    hosts:
+      - 123.45.67.89
+    env:
+      clear:
+        PORT: 3001
+    command: npm start
+    ports:
+      - "3001:3001"

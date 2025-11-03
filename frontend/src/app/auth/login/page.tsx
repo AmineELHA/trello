@@ -68,6 +68,41 @@ export default function LoginPage() {
       if (data.success && data.token) {
         // Set token in localStorage as fallback for client-side operations
         localStorage.setItem("token", data.token);
+        
+        // Fetch user data to store in localStorage for UserContext
+        try {
+          // Make an authenticated request to get user data
+          const userResponse = await fetch('/api/graphql', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${data.token}`,
+            },
+            body: JSON.stringify({
+              query: `
+                query GetCurrentUser {
+                  currentUser {
+                    id
+                    email
+                    firstName
+                    lastName
+                    username
+                  }
+                }
+              `
+            })
+          });
+          
+          const userResult = await userResponse.json();
+          if (userResult.data && userResult.data.currentUser) {
+            localStorage.setItem("userData", JSON.stringify(userResult.data.currentUser));
+          }
+        } catch (err) {
+          console.error("Error fetching user data after login:", err);
+          // If we can't fetch user data, we'll still proceed to boards
+          // The UserContext will try to decode from the JWT as a fallback
+        }
+        
         router.push("/boards");
       }
     } catch (err) {
