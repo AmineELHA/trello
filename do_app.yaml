@@ -1,0 +1,41 @@
+services:
+- name: trello-app
+  github:
+    repo: your-username/your-trello-repo
+    branch: main
+  dockerfile_path: Dockerfile.unified
+  run_command: /entrypoint.sh
+  environment_slug: node-js
+  http_port: 3000
+  envs:
+  - key: RAILS_ENV
+    value: production
+    scope: RUN_AND_BUILD_TIME
+  - key: NODE_ENV
+    value: production
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_HOST
+    value: localhost
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_NAME
+    value: trello_production
+    scope: RUN_AND_BUILD_TIME
+  - key: DB_USERNAME
+    value: postgres
+    scope: RUN_AND_BUILD_TIME
+  - key: SECRET_KEY_BASE
+    value: your-generated-secret-key
+    type: SECRET
+  - key: DB_PASSWORD
+    value: your-secure-db-password
+    type: SECRET
+  - key: FRONTEND_URL
+    value: "https://your-app-name.ondigitalocean.app"
+    scope: RUN_AND_BUILD_TIME
+  - key: RAILS_HOST
+    value: "https://your-app-name.ondigitalocean.app"
+    scope: RUN_AND_BUILD_TIME
+  - key: NEXT_PUBLIC_GRAPHQL_ENDPOINT
+    value: "https://your-app-name.ondigitalocean.app/graphql"
+    scope: RUN_AND_BUILD_TIME
+  instance_size_slug: basic-xxs
