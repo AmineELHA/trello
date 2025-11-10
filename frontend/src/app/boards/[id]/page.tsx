@@ -136,14 +136,51 @@ export default function BoardDetailPage() {
     mutationFn: async (variables: { name: string; board_id: number }) => {
       return await client.request(CREATE_COLUMN, variables);
     },
-    onSuccess: () => {
-      // Refetch to update the UI with the new column
-      setTimeout(() => refetch(), 100);
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches to avoid conflicts
+      await queryClient.cancelQueries({ queryKey: ["board", boardId] });
+
+      // Snapshot previous value to enable rollback if needed
+      const previousBoard = queryClient.getQueryData(["board", boardId]);
+
+      try {
+        // Update local cache optimistically
+        queryClient.setQueryData(["board", boardId], (old: any) => {
+          if (!old) return old;
+          
+          const updatedBoard = { ...old };
+          
+          // Add a new column with default values (we'll update with server response later)
+          const newColumn = {
+            id: `temp-${Date.now()}`, // Temporary ID until server response
+            name: variables.name,
+            position: updatedBoard.columns.length + 1, // New column at the end
+            tasks: []
+          };
+          
+          updatedBoard.columns.push(newColumn);
+          
+          return updatedBoard;
+        });
+
+        return { previousBoard };
+      } catch (err) {
+        console.error("Optimistic update failed:", err);
+        return { previousBoard };
+      }
     },
-    onError: (error) => {
-      console.error("Error creating column:", error);
+    onError: (err, variables, context) => {
+      console.error("Error creating column:", err);
+      // Roll back to previous state if mutation failed
+      if (context?.previousBoard) {
+        queryClient.setQueryData(["board", boardId], context.previousBoard);
+      }
       alert("Failed to create column. Please make sure you are logged in.");
     },
+    onSuccess: (data) => {
+      // On success, we don't need to manually refetch since React Query handles cache updates
+      console.log("Column creation successful");
+    }
   });
 
   // Define the response type for CREATE_TASK mutation
@@ -177,12 +214,11 @@ export default function BoardDetailPage() {
       // Clear the input fields after successful creation
       setNewTaskTitle(prev => {
         const newTitles = { ...prev };
-        // We can't clear specific entries without knowing which column was updated
-        // So we'll just refetch which will clear all inputs
-        return newTitles;
+        // Find the column id that this task was added to and clear its input
+        return Object.fromEntries(
+          Object.entries(newTitles).map(([key, value]) => [key, key === variables.column_id ? "" : value])
+        );
       });
-      // Refetch to update the UI with the new task
-      setTimeout(() => refetch(), 100);
     },
     onError: (error) => {
       console.error("Error creating task:", error);
@@ -195,14 +231,87 @@ export default function BoardDetailPage() {
     mutationFn: async (variables: { task_id: string; new_column_id?: string; new_position: number }) => {
       return await client.request(REORDER_TASK, variables);
     },
-    onSuccess: () => {
-      // Refetch to sync with server state after a short delay to avoid interference with ongoing drag operations
-      setTimeout(() => refetch(), 100);
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches to avoid conflicts
+      await queryClient.cancelQueries({ queryKey: ["board", boardId] });
+
+      // Snapshot previous value to enable rollback if needed
+      const previousBoard = queryClient.getQueryData(["board", boardId]);
+
+      try {
+        // Update local cache optimistically
+        queryClient.setQueryData(["board", boardId], (old: any) => {
+          if (!old) return old;
+          
+          const updatedBoard = { ...old };
+          const allTasks = updatedBoard.columns.flatMap((col: any) => col.tasks);
+          const taskToMove = allTasks.find((task: any) => task.id === variables.task_id);
+          
+          if (!taskToMove) return old;
+          
+          // Find the source column and remove task
+          const sourceColumn = updatedBoard.columns.find((col: any) => 
+            col.tasks.some((task: any) => task.id === variables.task_id)
+          );
+          
+          if (!sourceColumn) return old;
+          
+          const sourceTaskIndex = sourceColumn.tasks.findIndex((task: any) => task.id === variables.task_id);
+          if (sourceTaskIndex === -1) return old;
+          
+          const [movedTask] = sourceColumn.tasks.splice(sourceTaskIndex, 1);
+          
+          // Update positions in source column
+          sourceColumn.tasks.forEach((task: any, idx: number) => {
+            task.position = idx + 1;
+          });
+          
+          // If moving to a different column
+          if (variables.new_column_id && variables.new_column_id !== sourceColumn.id) {
+            const destColumn = updatedBoard.columns.find((col: any) => col.id === variables.new_column_id);
+            if (destColumn) {
+              // Add task to destination column
+              const newTask = { ...movedTask, position: variables.new_position };
+              destColumn.tasks.splice(variables.new_position - 1, 0, newTask);
+              
+              // Update positions in destination column
+              destColumn.tasks.forEach((task: any, idx: number) => {
+                task.position = idx + 1;
+              });
+            }
+          } else {
+            // Moving within same column - add back at new position
+            movedTask.position = variables.new_position;
+            sourceColumn.tasks.splice(variables.new_position - 1, 0, movedTask);
+            
+            // Update positions in source column
+            sourceColumn.tasks.forEach((task: any, idx: number) => {
+              task.position = idx + 1;
+            });
+          }
+          
+          return updatedBoard;
+        });
+
+        return { previousBoard };
+      } catch (err) {
+        console.error("Optimistic update failed:", err);
+        return { previousBoard };
+      }
     },
-    onError: (error) => {
-      console.error("Error reordering task:", error);
+    onError: (err, variables, context) => {
+      console.error("Error reordering task:", err);
+      // Roll back to previous state if mutation failed
+      if (context?.previousBoard) {
+        queryClient.setQueryData(["board", boardId], context.previousBoard);
+      }
       alert("Failed to move task. Please try again.");
     },
+    onSuccess: () => {
+      // On success, we don't need to do anything as the optimistic update was correct
+      // The cache is already updated with the proper values
+      console.log("Task reorder successful");
+    }
   });
 
   // Mutation to reorder a column
@@ -210,14 +319,57 @@ export default function BoardDetailPage() {
     mutationFn: async (variables: { column_id: string; new_position: number }) => {
       return await client.request(REORDER_COLUMN, variables);
     },
-    onSuccess: () => {
-      // Refetch to sync with server state after a short delay to avoid interference with ongoing drag operations
-      setTimeout(() => refetch(), 100);
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches to avoid conflicts
+      await queryClient.cancelQueries({ queryKey: ["board", boardId] });
+
+      // Snapshot previous value to enable rollback if needed
+      const previousBoard = queryClient.getQueryData(["board", boardId]);
+
+      try {
+        // Update local cache optimistically
+        queryClient.setQueryData(["board", boardId], (old: any) => {
+          if (!old) return old;
+          
+          const updatedBoard = { ...old };
+          const columnToMove = updatedBoard.columns.find((col: any) => col.id === variables.column_id);
+          
+          if (!columnToMove) return old;
+          
+          const sourceIndex = updatedBoard.columns.findIndex((col: any) => col.id === variables.column_id);
+          if (sourceIndex === -1) return old;
+          
+          const [movedColumn] = updatedBoard.columns.splice(sourceIndex, 1);
+          
+          // Add column at new position
+          updatedBoard.columns.splice(variables.new_position - 1, 0, movedColumn);
+          
+          // Update positions
+          updatedBoard.columns.forEach((col: any, idx: number) => {
+            col.position = idx + 1;
+          });
+          
+          return updatedBoard;
+        });
+
+        return { previousBoard };
+      } catch (err) {
+        console.error("Optimistic update failed:", err);
+        return { previousBoard };
+      }
     },
-    onError: (error) => {
-      console.error("Error reordering column:", error);
+    onError: (err, variables, context) => {
+      console.error("Error reordering column:", err);
+      // Roll back to previous state if mutation failed
+      if (context?.previousBoard) {
+        queryClient.setQueryData(["board", boardId], context.previousBoard);
+      }
       alert("Failed to reorder column. Please try again.");
     },
+    onSuccess: () => {
+      // On success, we don't need to do anything as the optimistic update was correct
+      console.log("Column reorder successful");
+    }
   });
 
   // Mutation to delete a task
@@ -225,14 +377,54 @@ export default function BoardDetailPage() {
     mutationFn: async (variables: { id: string }) => {
       return await client.request(DELETE_TASK, variables);
     },
-    onSuccess: () => {
-      // Refetch to sync with server state after a short delay
-      setTimeout(() => refetch(), 100);
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches to avoid conflicts
+      await queryClient.cancelQueries({ queryKey: ["board", boardId] });
+
+      // Snapshot previous value to enable rollback if needed
+      const previousBoard = queryClient.getQueryData(["board", boardId]);
+
+      try {
+        // Update local cache optimistically
+        queryClient.setQueryData(["board", boardId], (old: any) => {
+          if (!old) return old;
+          
+          const updatedBoard = { ...old };
+          
+          // Find the task and remove it from its column
+          for (const column of updatedBoard.columns) {
+            const taskIndex = column.tasks.findIndex((task: any) => task.id === variables.id);
+            if (taskIndex !== -1) {
+              column.tasks.splice(taskIndex, 1);
+              // Update positions after removal
+              column.tasks.forEach((task: any, idx: number) => {
+                task.position = idx + 1;
+              });
+              break;
+            }
+          }
+          
+          return updatedBoard;
+        });
+
+        return { previousBoard };
+      } catch (err) {
+        console.error("Optimistic update failed:", err);
+        return { previousBoard };
+      }
     },
-    onError: (error) => {
-      console.error("Error deleting task:", error);
+    onError: (err, variables, context) => {
+      console.error("Error deleting task:", err);
+      // Roll back to previous state if mutation failed
+      if (context?.previousBoard) {
+        queryClient.setQueryData(["board", boardId], context.previousBoard);
+      }
       alert("Failed to delete task. Please try again.");
     },
+    onSuccess: () => {
+      // On success, we don't need to do anything as the optimistic update was correct
+      console.log("Task deletion successful");
+    }
   });
 
   // Mutation to update a task
@@ -252,16 +444,82 @@ export default function BoardDetailPage() {
     }) => {
       return await client.request(UPDATE_TASK, variables);
     },
-    onSuccess: (data, variables) => {
-      console.log('Task updated successfully:', data);
-      console.log('Variables sent:', variables);
-      // Immediately refetch to sync with server state
-      refetch();
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches to avoid conflicts
+      await queryClient.cancelQueries({ queryKey: ["board", boardId] });
+
+      // Snapshot previous value to enable rollback if needed
+      const previousBoard = queryClient.getQueryData(["board", boardId]);
+
+      try {
+        // Update local cache optimistically
+        queryClient.setQueryData(["board", boardId], (old: any) => {
+          if (!old) return old;
+          
+          const updatedBoard = { ...old };
+          
+          // Find the task and update its properties
+          for (const column of updatedBoard.columns) {
+            const taskIndex = column.tasks.findIndex((task: any) => task.id === variables.id);
+            if (taskIndex !== -1) {
+              const task = column.tasks[taskIndex];
+              // Update task properties based on what was provided in variables
+              if (variables.title !== undefined) task.title = variables.title;
+              if (variables.description !== undefined) task.description = variables.description;
+              if (variables.due_date !== undefined) task.dueDate = variables.due_date;
+              if (variables.reminder_date !== undefined) task.reminderDate = variables.reminder_date;
+              if (variables.labels !== undefined) task.labels = variables.labels;
+              if (variables.checklists !== undefined) task.checklists = variables.checklists;
+              if (variables.attachments !== undefined) task.attachments = variables.attachments;
+              if (variables.color !== undefined) task.color = variables.color;
+              if (variables.position !== undefined) task.position = variables.position;
+              
+              // If column_id is provided and different, move the task to that column
+              if (variables.column_id && variables.column_id !== column.id) {
+                // Remove from current column
+                const [movedTask] = column.tasks.splice(taskIndex, 1);
+                
+                // Update positions in source column
+                column.tasks.forEach((task: any, idx: number) => {
+                  task.position = idx + 1;
+                });
+                
+                // Find destination column and add the task
+                const destColumn = updatedBoard.columns.find((col: any) => col.id === variables.column_id);
+                if (destColumn) {
+                  destColumn.tasks.push(movedTask);
+                  // Update positions in destination column
+                  destColumn.tasks.forEach((task: any, idx: number) => {
+                    task.position = idx + 1;
+                  });
+                }
+              }
+              
+              break;
+            }
+          }
+          
+          return updatedBoard;
+        });
+
+        return { previousBoard };
+      } catch (err) {
+        console.error("Optimistic update failed:", err);
+        return { previousBoard };
+      }
     },
-    onError: (error) => {
-      console.error("Error updating task:", error);
+    onError: (err, variables, context) => {
+      console.error("Error updating task:", err);
+      // Roll back to previous state if mutation failed
+      if (context?.previousBoard) {
+        queryClient.setQueryData(["board", boardId], context.previousBoard);
+      }
       alert("Failed to update task. Please try again.");
     },
+    onSuccess: () => {
+      // On success, we don't need to do anything as the optimistic update was correct
+      console.log("Task update successful");
+    }
   });
 
   // Mutation to delete a column
@@ -269,14 +527,52 @@ export default function BoardDetailPage() {
     mutationFn: async (variables: { id: string }) => {
       return await client.request(DELETE_COLUMN, variables);
     },
-    onSuccess: () => {
-      // Refetch to sync with server state after a short delay
-      setTimeout(() => refetch(), 100);
+    onMutate: async (variables) => {
+      // Cancel outgoing refetches to avoid conflicts
+      await queryClient.cancelQueries({ queryKey: ["board", boardId] });
+
+      // Snapshot previous value to enable rollback if needed
+      const previousBoard = queryClient.getQueryData(["board", boardId]);
+
+      try {
+        // Update local cache optimistically
+        queryClient.setQueryData(["board", boardId], (old: any) => {
+          if (!old) return old;
+          
+          const updatedBoard = { ...old };
+          
+          // Find and remove the column
+          const colIndex = updatedBoard.columns.findIndex((col: any) => col.id === variables.id);
+          if (colIndex !== -1) {
+            updatedBoard.columns.splice(colIndex, 1);
+            
+            // Update positions of remaining columns
+            updatedBoard.columns.forEach((col: any, idx: number) => {
+              col.position = idx + 1;
+            });
+          }
+          
+          return updatedBoard;
+        });
+
+        return { previousBoard };
+      } catch (err) {
+        console.error("Optimistic update failed:", err);
+        return { previousBoard };
+      }
     },
-    onError: (error) => {
-      console.error("Error deleting column:", error);
+    onError: (err, variables, context) => {
+      console.error("Error deleting column:", err);
+      // Roll back to previous state if mutation failed
+      if (context?.previousBoard) {
+        queryClient.setQueryData(["board", boardId], context.previousBoard);
+      }
       alert("Failed to delete column. Please try again.");
     },
+    onSuccess: () => {
+      // On success, we don't need to do anything as the optimistic update was correct
+      console.log("Column deletion successful");
+    }
   });
 
   const handleCreateTask = (e: React.FormEvent, columnId: string) => {
@@ -571,7 +867,7 @@ export default function BoardDetailPage() {
         reorderTaskMutation.mutate({
           task_id: activeId as string,
           new_column_id: newColumns[destColIndex].id,
-          new_position: newColumns[destColIndex].tasks.length
+          new_position: newColumns[destColIndex].tasks.length + 1
         });
       }
     }
