@@ -20,18 +20,10 @@ gem install kamal
 
 ### 2. Configure deploy.yml
 Edit `deploy.yml` and replace:
-- `your-username` → Your Docker Hub username (or GitHub username for ghcr.io)
 - `YOUR_SERVER_IP` → Your server's IP address (e.g., 192.168.1.100)
 - `your-domain.com` → Your domain name (or remove `proxy:` section if no domain)
 
-**For GitHub Container Registry (ghcr.io), use:**
-```yaml
-registry:
-  server: ghcr.io
-  username: your-github-username
-  password:
-    - KAMAL_REGISTRY_PASSWORD
-```
+**Note:** This setup uses **local registry** - the Docker image will be built directly on your server. No Docker Hub or external registry needed!
 
 ### 3. Set Up Secrets
 ```bash
@@ -43,7 +35,6 @@ nano .kamal/secrets  # or use your preferred editor
 ```
 
 **Required values:**
-- `KAMAL_REGISTRY_PASSWORD` - Docker Hub password OR GitHub Personal Access Token (with read:packages, write:packages permissions)
 - `POSTGRES_PASSWORD` - Strong password for PostgreSQL (e.g., generate with `openssl rand -base64 32`)
 - `SECRET_KEY_BASE` - Generate with: `cd backend && bin/rails secret`
 - `SENTRY_DSN` - Optional: from https://sentry.io (create Rails project)
@@ -104,14 +95,11 @@ kamal deploy
 ssh-copy-id root@YOUR_SERVER_IP
 ```
 
-**Issue: "Cannot connect to Docker registry"**
-- Check KAMAL_REGISTRY_PASSWORD in .kamal/secrets
-- For GitHub: Use Personal Access Token, not password
-- For Docker Hub: Use Access Token from https://hub.docker.com/settings/security
-
 **Issue: "Image build failed"**
-- Run `docker build -t test .` locally to see the error
+- The build happens directly on your server
+- SSH to server and check Docker logs: `docker ps -a`
 - Check that all package.json and Gemfile dependencies are correct
+- Ensure server has enough disk space: `df -h`
 
 **Issue: "Healthcheck failed"**
 - Check logs: `kamal app logs`

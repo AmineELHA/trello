@@ -24,9 +24,10 @@ gem install kamal
 
 Edit the `deploy.yml` file in the root directory:
 
-- Replace `your-username` with your Docker registry username
 - Replace `YOUR_SERVER_IP` with your server's IP address
 - Replace `your-domain.com` with your domain (or remove `proxy` section for no SSL)
+
+**Note:** This setup uses a **local registry** - Docker images are built directly on your server. No external Docker registry (Docker Hub/GitHub) is required.
 
 ### 2. Set up secrets
 
@@ -38,12 +39,11 @@ cp .kamal/secrets.example .kamal/secrets
 
 Edit `.kamal/secrets` and fill in:
 
-- `KAMAL_REGISTRY_PASSWORD`: Your Docker registry password/token
 - `POSTGRES_PASSWORD`: A strong password for PostgreSQL
 - `SECRET_KEY_BASE`: Generate with `cd backend && bin/rails secret`
-- `SENTRY_DSN`: Backend Sentry DSN from https://sentry.io (create a Rails project)
-- `NEXT_PUBLIC_SENTRY_DSN`: Frontend Sentry DSN from https://sentry.io (create a Next.js project)
-- `NEXT_PUBLIC_POSTHOG_KEY`: PostHog API key from https://posthog.com
+- `SENTRY_DSN`: Backend Sentry DSN from https://sentry.io (optional)
+- `NEXT_PUBLIC_SENTRY_DSN`: Frontend Sentry DSN from https://sentry.io (optional)
+- `NEXT_PUBLIC_POSTHOG_KEY`: PostHog API key from https://posthog.com (optional)
 
 Make sure `.kamal/secrets` is in your `.gitignore`.
 

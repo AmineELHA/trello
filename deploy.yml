@@ -2,7 +2,7 @@
 # Single server deployment with both frontend and backend
 
 service: trello-app
-image: your-username/trello-app
+image: trello-app
 
 # Deploy to a single server
 servers:
@@ -14,11 +14,12 @@ proxy:
   ssl: true
   host: your-domain.com
 
-# Container registry configuration (Docker Hub, ghcr.io, etc.)
-registry:
-  username: your-username
-  password:
-    - KAMAL_REGISTRY_PASSWORD
+# Local registry configuration (no authentication needed)
+# The image will be built and cached locally on the server
+builder:
+  local:
+    arch: amd64
+    host: unix:///var/run/docker.sock
 
 # Environment variables
 env:
@@ -68,12 +69,6 @@ healthcheck:
   port: 80
   max_attempts: 7
   interval: 10s
-
-# Build configuration
-builder:
-  arch: amd64
-  cache:
-    type: registry
 
 # Volume mounts for persistent data
 volumes:
