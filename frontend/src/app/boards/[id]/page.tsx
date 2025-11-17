@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getGraphQLClient } from "../../lib/graphqlClient";
-import { CREATE_COLUMN, CREATE_TASK, REORDER_TASK, REORDER_COLUMN, DELETE_TASK, UPDATE_TASK, DELETE_COLUMN } from "../../graphql/mutations";
-import { GET_BOARD } from "../../graphql/queries";
+import { getBoard } from "../../graphql/queries";
+import { createColumn, createTask, reorderTask, reorderColumn, deleteTask, updateTask, deleteColumn } from "../../graphql/mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -115,8 +114,7 @@ export default function BoardDetailPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["board", boardId],
     queryFn: async () => {
-      const client = getGraphQLClient();
-      const res = await client.request<BoardResponse>(GET_BOARD, { id: boardId });
+      const res = await getBoard(boardId);
       return res.board;
     },
     enabled: !authLoading && !!user, // Only run the query when authenticated and auth is loaded

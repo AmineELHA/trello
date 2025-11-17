@@ -4,9 +4,8 @@ import { useState, useRef, ChangeEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getGraphQLClient } from "../lib/graphqlClient";
-import { UPDATE_USER } from "../graphql/mutations";
-import { useTheme } from "../contexts/ThemeContext"; 
+import { updateUser } from "../graphql/mutations";
+import { useTheme } from "../contexts/ThemeContext";
 import { useUser } from "../contexts/UserContext";
 import { Moon, Sun, Camera, User, Check, X } from "lucide-react";
 
@@ -15,8 +14,6 @@ export default function SettingsPage() {
   const { user, loading, refetchUser } = useUser();
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const client = getGraphQLClient();
 
   interface UpdateUserResponse {
     updateUser: {
@@ -35,7 +32,7 @@ export default function SettingsPage() {
   // Mutation to update user profile (avatar only)
   const updateUserMutation = useMutation<UpdateUserResponse, Error, { firstName?: string; lastName?: string; username?: string; avatar?: string }>({
     mutationFn: async (variables) => {
-      return await client.request(UPDATE_USER, variables);
+      return await updateUser(variables.firstName, variables.lastName, variables.username, variables.avatar);
     },
     onSuccess: (data) => {
       // Update user data in localStorage to reflect the changes immediately

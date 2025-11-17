@@ -9,8 +9,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { getGraphQLClient } from "./lib/graphqlClient";
-import { GET_BOARDS } from "./graphql/queries";
+import { getBoards } from "./graphql/queries";
 import { NotificationBell } from "@/components/ui/notification-bell";
 
 export default function HomePage() {
@@ -91,14 +90,10 @@ export default function HomePage() {
     boards: Board[];
   }
   
-  // Fetch user's boards if authenticated
-  const client = getGraphQLClient();
-  
   const { data: boardsData, isLoading: boardsLoading } = useQuery<BoardsResponse>({
     queryKey: ["boards"],
     queryFn: async () => {
-      const res = await client.request<BoardsResponse>(GET_BOARDS);
-      return res;
+      return await getBoards();
     },
     enabled: isAuthenticated, // Only fetch if user is authenticated
   });

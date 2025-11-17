@@ -1,0 +1,17 @@
+# Kamal deployment secrets
+/.kamal/secrets
+
+# Backend files
+/backend
+
+# Frontend files
+/frontend
+
+# Environment files
+.env*
+
+# Logs
+*.log
+
+# Temporary files
+/tmp

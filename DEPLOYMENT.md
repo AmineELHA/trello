@@ -1,150 +1,183 @@
-# Deployment Instructions for DigitalOcean
+# Deployment Instructions
 
-This document provides step-by-step instructions for deploying the Trello Clone application to DigitalOcean App Platform.
+This document provides step-by-step instructions for deploying the Trello Clone application using Kamal 2.
 
 ## Prerequisites
 
-1. A DigitalOcean account
-2. A GitHub repository containing this codebase
-3. A generated `SECRET_KEY_BASE` for Rails
-4. (Optional) A domain name if you want to use a custom domain
+1. A server with Ubuntu 20.04+ (VPS from DigitalOcean, Hetzner, AWS, etc.)
+2. Ruby installed locally (for running Kamal)
+3. Docker registry account (Docker Hub, GitHub Container Registry, etc.)
+4. Domain name pointed to your server (optional, for SSL)
+5. SSH access to your server
 
-## Environment Variables Required
+## Installation
 
-Before deploying, you need to set the following environment variables:
+Install Kamal 2 globally:
 
-### For Rails:
-- `SECRET_KEY_BASE`: Generate using `cd backend && bundle exec rake secret`
-- `DB_HOST`: Database host (for unified deployment, use "localhost")
-- `DB_NAME`: Database name (e.g., "trello_production")
-- `DB_USERNAME`: Database username (e.g., "postgres")
-- `DB_PASSWORD`: Database password (should be complex)
+```bash
+gem install kamal
+```
 
-### For Next.js:
-- `NEXT_PUBLIC_GRAPHQL_ENDPOINT`: URL to your GraphQL endpoint (e.g., "https://your-app.ondigitalocean.app/graphql")
+## Configuration
 
-### General:
-- `FRONTEND_URL`: URL of your frontend (e.g., "https://your-app.ondigitalocean.app")
-- `RAILS_HOST`: URL of your Rails app (e.g., "https://your-app.ondigitalocean.app")
+### 1. Update `deploy.yml`
 
-## Deployment Steps
+Edit the `deploy.yml` file in the root directory:
 
-### Option 1: Using DigitalOcean App Platform (Recommended)
+- Replace `your-username` with your Docker registry username
+- Replace `YOUR_SERVER_IP` with your server's IP address
+- Replace `your-domain.com` with your domain (or remove `proxy` section for no SSL)
 
-1. **Prepare your GitHub repository**:
-   - Make sure all files in this repository are committed to your GitHub repo
-   - Ensure `Dockerfile.unified`, `entrypoint.sh`, and `nginx.conf` are in the root directory
+### 2. Set up secrets
 
-2. **Log in to DigitalOcean**:
-   - Go to https://cloud.digitalocean.com/apps
-   - Click "Create App"
+Copy the example secrets file:
 
-3. **Connect your repository**:
-   - Click "GitHub" to connect your GitHub account
-   - Select your repository containing this Trello Clone code
+```bash
+cp .kamal/secrets.example .kamal/secrets
+```
 
-4. **Configure your app**:
-   - DigitalOcean should detect the Dockerfile automatically
-   - Set the HTTP port to `3000`
-   - Set the Run Command to `/entrypoint.sh`
-   - Select the `Dockerfile.unified` as your Dockerfile
+Edit `.kamal/secrets` and fill in:
 
-5. **Set environment variables**:
-   - Add all the required environment variables mentioned above
-   - Mark sensitive values (like `DB_PASSWORD` and `SECRET_KEY_BASE`) as "Secret"
+- `KAMAL_REGISTRY_PASSWORD`: Your Docker registry password/token
+- `POSTGRES_PASSWORD`: A strong password for PostgreSQL
+- `SECRET_KEY_BASE`: Generate with `cd backend && bin/rails secret`
+- `SENTRY_DSN`: Backend Sentry DSN from https://sentry.io (create a Rails project)
+- `NEXT_PUBLIC_SENTRY_DSN`: Frontend Sentry DSN from https://sentry.io (create a Next.js project)
+- `NEXT_PUBLIC_POSTHOG_KEY`: PostHog API key from https://posthog.com
 
-6. **Configure resources**:
-   - Select an appropriate instance size (at least basic-xxs for development)
-   - The unified approach runs both frontend and backend in one container
+Make sure `.kamal/secrets` is in your `.gitignore`.
 
-7. **Deploy**:
-   - Click "Next" and then "Create Resources"
-   - Wait for the build and deployment to complete
-   - Your app will be accessible at a URL like `https://your-app-name.ondigitalocean.app`
+### 3. Prepare your server
 
-### Option 2: Manual Deployment to a Droplet
+Kamal will automatically install Docker on your server, but make sure:
 
-1. **Create a DigitalOcean Droplet**:
-   - Create a new Ubuntu 22.04 droplet (recommended: at least 2GB RAM)
-   - SSH into your droplet
+- You can SSH to your server as root: `ssh root@YOUR_SERVER_IP`
+- Your SSH key is added to the server
+- Port 80 and 443 are open in your firewall
 
-2. **Install Docker**:
-   ```bash
-   sudo apt update
-   sudo apt install -y docker.io docker-compose-v2
-   sudo systemctl start docker
-   sudo systemctl enable docker
-   sudo usermod -aG docker $USER
-   ```
+## Deployment
 
-3. **Clone your repository**:
-   ```bash
-   git clone https://github.com/your-username/your-repo.git
-   cd your-repo
-   ```
+### Initial Setup
 
-4. **Build and run the Docker container**:
-   ```bash
-   # Build the image
-   docker build -t trello-unified -f Dockerfile.unified .
+Initialize accessories (PostgreSQL and Redis) and deploy:
 
-   # Run the container
-   docker run -d \
-     --name trello-app \
-     -p 3000:3000 \
-     -e RAILS_ENV=production \
-     -e NODE_ENV=production \
-     -e DB_HOST=localhost \
-     -e DB_NAME=trello_production \
-     -e DB_USERNAME=postgres \
-     -e DB_PASSWORD=your_secure_password \
-     -e SECRET_KEY_BASE=your_generated_secret \
-     -e FRONTEND_URL=http://your-droplet-ip:3000 \
-     -e RAILS_HOST=http://your-droplet-ip:3000 \
-     -e NEXT_PUBLIC_GRAPHQL_ENDPOINT=http://your-droplet-ip:3000/graphql \
-     trello-unified
-   ```
+```bash
+kamal setup
+```
 
-5. **Set up a reverse proxy (optional but recommended)**:
-   - Install and configure Nginx to handle HTTPS and provide a custom domain
+This will:
+- Install Docker on your server (if needed)
+- Build and push your Docker image
+- Start PostgreSQL and Redis containers
+- Deploy your application container
+- Set up nginx to route traffic
+- Configure SSL with Let's Encrypt (if domain configured)
 
-## Architecture Notes
+### Subsequent Deployments
 
-This deployment uses a unified Docker approach where:
-- Both the Next.js frontend and Rails API backend run in the same container
-- Nginx acts as a reverse proxy to route requests appropriately
-- API requests (like `/graphql`) are routed to the Rails backend
-- Static assets and frontend routes are served by Next.js
-- A PostgreSQL database runs in the same container (for unified deployment)
+For updates after the initial setup:
 
-## Important Security Notes
+```bash
+kamal deploy
+```
 
-1. Never commit `config/master.key` or other sensitive files to version control
-2. Always use strong, unique passwords for database access
-3. Use HTTPS in production
+This will build, push, and deploy the new version with zero-downtime.
+
+## Common Commands
+
+```bash
+# View application logs
+kamal app logs -f
+
+# Open Rails console
+kamal console
+
+# Run database migrations
+kamal migrate
+
+# SSH into the container
+kamal shell
+
+# Restart the application
+kamal app restart
+
+# Check container status
+kamal app details
+
+# View accessory (DB/Redis) logs
+kamal accessory logs db -f
+kamal accessory logs redis -f
+
+# Rollback to previous version
+kamal rollback
+```
+
+## Architecture
+
+The deployment uses:
+
+- **Nginx** (port 80): Routes traffic to Rails (port 3000) or Next.js (port 3001)
+- **Rails backend** (port 3000): GraphQL API and WebSocket (Action Cable)
+- **Next.js frontend** (port 3001): Server-side rendered React app
+- **PostgreSQL**: Database (managed by Kamal as accessory)
+- **Redis**: Cache and Action Cable adapter (managed by Kamal as accessory)
+- **Supervisor**: Manages Rails, Next.js, and Nginx processes
+
+All services run in a single Docker container for simplicity.
+
+## Security
+
+1. Never commit `.kamal/secrets` or `config/master.key` to version control
+2. Use strong, unique passwords for database access
+3. Kamal automatically sets up SSL with Let's Encrypt if domain is configured
 4. Regularly update the base Docker images
 5. Monitor your app for security vulnerabilities
 
 ## Troubleshooting
 
-### If the app fails to start:
-- Check the DigitalOcean logs in the App Platform dashboard
-- Make sure all required environment variables are set
-- Verify the SECRET_KEY_BASE is correctly generated
+### Container won't start
 
-### Database issues:
-- Ensure the database is properly initialized
-- Check that database credentials are correct
-- Verify the database is accessible from within the container
+```bash
+kamal app logs
+```
 
-### Frontend/Backend communication issues:
-- Verify that NEXT_PUBLIC_GRAPHQL_ENDPOINT points to the correct location
-- Check that CORS settings (if any) allow the necessary requests
+### Database connection issues
 
-## Scaling
+Check if PostgreSQL accessory is running:
 
-For production deployments with high traffic, consider:
-- Moving the database to DigitalOcean's Managed Database service
-- Using separate containers for frontend, backend, and database
-- Adding a CDN for static assets
-- Implementing caching layers as needed
+```bash
+kamal accessory details db
+```
+
+### SSL certificate issues
+
+Make sure your domain DNS is pointing to the server before running `kamal setup`.
+
+### Check healthcheck status
+
+```bash
+kamal app exec 'curl localhost/up'
+```
+
+## Custom Domain
+
+To use a custom domain:
+
+1. Point your domain's A record to your server IP
+2. Update `proxy.host` in `deploy.yml`
+3. Run `kamal setup` or `kamal deploy`
+
+Kamal will automatically obtain SSL certificates via Let's Encrypt.
+
+## Monitoring and Analytics
+
+The application includes integrated error tracking and analytics:
+
+- **Sentry**: Error tracking for both frontend and backend
+- **PostHog**: Product analytics and user behavior tracking
+
+See [MONITORING.md](MONITORING.md) for detailed setup instructions.
+
+## Environment Variables
+
+Edit `deploy.yml` to add more environment variables under the `env` section.

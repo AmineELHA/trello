@@ -1,7 +1,6 @@
 // src/app/api/auth/login/route.ts
 import { NextResponse } from 'next/server';
-import { getGraphQLClient } from '../../../lib/graphqlClient';
-import { LOGIN_USER } from '../../../graphql/mutations';
+import { loginUser } from '../../../graphql/mutations';
 
 interface LoginResult {
   login: {
@@ -15,8 +14,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password } = body;
 
-    const client = getGraphQLClient();
-    const result = await client.request<LoginResult>(LOGIN_USER, { email, password });
+    const result = await loginUser(email, password);
 
     if (result.login.errors && result.login.errors.length > 0) {
       return NextResponse.json(

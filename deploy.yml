@@ -1,0 +1,92 @@
+# Kamal 2 deployment configuration for Trello clone
+# Single server deployment with both frontend and backend
+
+service: trello-app
+image: your-username/trello-app
+
+# Deploy to a single server
+servers:
+  web:
+    - YOUR_SERVER_IP
+
+# SSL with Let's Encrypt via Kamal's built-in proxy (kamal-proxy)
+proxy:
+  ssl: true
+  host: your-domain.com
+
+# Container registry configuration (Docker Hub, ghcr.io, etc.)
+registry:
+  username: your-username
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# Environment variables
+env:
+  secret:
+    - RAILS_MASTER_KEY
+    - DATABASE_URL
+    - REDIS_URL
+    - SECRET_KEY_BASE
+    - SENTRY_DSN
+    - NEXT_PUBLIC_SENTRY_DSN
+    - NEXT_PUBLIC_POSTHOG_KEY
+  clear:
+    RAILS_ENV: production
+    NODE_ENV: production
+    RAILS_SERVE_STATIC_FILES: true
+    RAILS_LOG_TO_STDOUT: true
+    NEXT_PUBLIC_POSTHOG_HOST: https://app.posthog.com
+    NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_TRACES_SAMPLE_RATE: "0.1"
+    SENTRY_PROFILES_SAMPLE_RATE: "0.1"
+
+# Database and Redis accessories
+accessories:
+  db:
+    image: postgres:15-alpine
+    host: YOUR_SERVER_IP
+    port: 5432
+    env:
+      clear:
+        POSTGRES_USER: postgres
+        POSTGRES_DB: trello_production
+      secret:
+        - POSTGRES_PASSWORD
+    directories:
+      - data:/var/lib/postgresql/data
+    
+  redis:
+    image: redis:7-alpine
+    host: YOUR_SERVER_IP
+    port: 6379
+    directories:
+      - data:/data
+
+# Healthcheck configuration (Kamal will poll this endpoint)
+healthcheck:
+  path: /up
+  port: 80
+  max_attempts: 7
+  interval: 10s
+
+# Build configuration
+builder:
+  arch: amd64
+  cache:
+    type: registry
+
+# Volume mounts for persistent data
+volumes:
+  - storage:/app/backend/storage
+
+# Aliases for common tasks
+aliases:
+  console: app exec -i --reuse "bash -c 'cd /app/backend && bin/rails console'"
+  shell: app exec -i --reuse "bash"
+  logs: app logs -f
+  dbconsole: app exec -i --reuse "bash -c 'cd /app/backend && bin/rails dbconsole'"
+  migrate: app exec "bash -c 'cd /app/backend && bin/rails db:migrate'"
+
+# SSH configuration
+ssh:
+  user: root

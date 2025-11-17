@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getGraphQLClient } from "../lib/graphqlClient";
-import { GET_BOARDS } from "../graphql/queries";
-import { CREATE_BOARD } from "../graphql/mutations";
+import { getBoards, createBoard } from "../graphql/queries";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
@@ -28,19 +26,16 @@ export default function BoardsPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["boards"],
     queryFn: async () => {
-      const client = getGraphQLClient();
-      const res = await client.request<BoardResponse>(GET_BOARDS);
+      const res = await getBoards();
       return res.boards;
     },
     enabled: !authLoading && !!user, // Only run the query when authenticated and auth is loaded
   });
 
-  const client = getGraphQLClient();
-
   // Mutation to create a board
   const createBoardMutation = useMutation({
     mutationFn: async (variables: { name: string }) => {
-      return await client.request(CREATE_BOARD, variables);
+      return await createBoard(variables.name);
     },
     onSuccess: () => {
       setBoardName("");
@@ -48,7 +43,7 @@ export default function BoardsPage() {
     },
     onError: (error) => {
       console.error("Error creating board:", error);
-      alert("Failed to create board. Please make sure you are logged in.");
+      alert("Failed to create board. Please make sure you are authenticated.");
     },
   });
 

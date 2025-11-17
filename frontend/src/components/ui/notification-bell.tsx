@@ -3,9 +3,9 @@
 import { Bell, X, CheckCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { GET_NOTIFICATIONS } from "@/app/graphql/queries";
-import { MARK_NOTIFICATION_AS_READ, MARK_ALL_NOTIFICATIONS_AS_READ } from "@/app/graphql/mutations";
-import { getGraphQLClient } from "@/app/lib/graphqlClient";
+import { getNotifications } from "@/app/graphql/queries";
+import { markNotificationAsRead, markAllNotificationsAsRead } from "@/app/graphql/mutations";
+import { getGraphQLClient, clearQueryCache } from "@/app/lib/graphqlClient";
 import { Button } from "@/components/ui/button";
 import useAuth from "@/app/hooks/useAuth";
 import useWebSocket from "@/app/hooks/useWebSocket";
@@ -33,8 +33,7 @@ export function NotificationBell() {
   const { data: notificationsData, isLoading } = useQuery<Notification[], Error>({
     queryKey: ["notifications"],
     queryFn: async () => {
-      const client = getGraphQLClient();
-      const response = await client.request<GetNotificationsResponse>(GET_NOTIFICATIONS);
+      const response = await getNotifications();
       return response.notifications;
     }
   });
@@ -64,17 +63,18 @@ export function NotificationBell() {
 
   const markAsRead = useMutation<MarkNotificationAsReadResponse["markNotificationAsRead"], Error, string, { previousNotifications: Notification[] | undefined }>({
     mutationFn: async (id) => {
-      const client = getGraphQLClient();
-      const response = await client.request<MarkNotificationAsReadResponse>(MARK_NOTIFICATION_AS_READ, { id });
-      return response.markNotificationAsRead;
+      const result = await markNotificationAsRead(id);
+      // Clear the query cache to ensure fresh data on next request
+      clearQueryCache();
+      return result;
     },
     onMutate: async (id) => {
       // Cancel outgoing refetches to prevent overwriting optimistic update
       await queryClient.cancelQueries({ queryKey: ["notifications"] });
-      
+
       // Snapshot previous value
       const previousNotifications = queryClient.getQueryData<Notification[]>(["notifications"]);
-      
+
       // Optimistically update cache
       queryClient.setQueryData(["notifications"], (old: Notification[] | undefined) => {
         if (!old) return old;
@@ -82,7 +82,7 @@ export function NotificationBell() {
           notification.id === id ? { ...notification, read: true } : notification
         );
       });
-      
+
       return { previousNotifications };
     },
     onError: (err, id, context) => {
@@ -106,25 +106,26 @@ export function NotificationBell() {
 
   const markAllAsRead = useMutation<MarkAllNotificationsAsReadResponse["markAllNotificationsAsRead"], Error, void, { previousNotifications: Notification[] | undefined }>({
     mutationFn: async () => {
-      const client = getGraphQLClient();
-      const response = await client.request<MarkAllNotificationsAsReadResponse>(MARK_ALL_NOTIFICATIONS_AS_READ);
-      return response.markAllNotificationsAsRead;
+      const result = await markAllNotificationsAsRead();
+      // Clear the query cache to ensure fresh data on next request
+      clearQueryCache();
+      return result;
     },
     onMutate: async () => {
       // Cancel outgoing refetches to prevent overwriting optimistic update
       await queryClient.cancelQueries({ queryKey: ["notifications"] });
-      
+
       // Snapshot previous value
       const previousNotifications = queryClient.getQueryData<Notification[]>(["notifications"]);
-      
+
       // Optimistically update cache
       queryClient.setQueryData(["notifications"], (old: Notification[] | undefined) => {
         if (!old) return old;
-        return old.map((notification: Notification) => 
+        return old.map((notification: Notification) =>
           ({ ...notification, read: true })
         );
       });
-      
+
       return { previousNotifications };
     },
     onError: (err, variables, context) => {

@@ -1,7 +1,6 @@
 // src/app/api/auth/register/route.ts
 import { NextResponse } from 'next/server';
-import { getGraphQLClient } from '../../../lib/graphqlClient';
-import { REGISTER_USER } from '../../../graphql/mutations';
+import { registerUser } from '../../../graphql/mutations';
 
 interface RegisterResult {
   signUp: {
@@ -22,14 +21,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password, firstName, lastName, username } = body;
 
-    const client = getGraphQLClient();
-    const result = await client.request<RegisterResult>(REGISTER_USER, {
-      email,
-      password,
-      firstName,
-      lastName,
-      username,
-    });
+    const result = await registerUser(email, password, firstName, lastName, username);
 
     if (result.signUp.errors && result.signUp.errors.length > 0) {
       return NextResponse.json(
